@@ -274,7 +274,7 @@ groups() ->
 init_per_suite(C) ->
     {Apps, _Ret} = pm_ct_helper:start_apps([woody, scoper, dmt_client, party_management]),
     ok = pm_domain:insert(construct_domain_fixture()),
-    [{apps, Apps}|C].
+    [{apps, Apps} | C].
 
 -spec end_per_suite(config()) -> _.
 end_per_suite(C) ->

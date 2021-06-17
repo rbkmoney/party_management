@@ -86,7 +86,6 @@ construct_service_handler(Name, Module, Opts) ->
 get_prometheus_route() ->
     {"/metrics/[:registry]", prometheus_cowboy2_handler, []}.
 
-
 %% Application callbacks
 
 -spec start(normal, any()) -> {ok, pid()} | {error, any()}.
