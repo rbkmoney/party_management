@@ -87,14 +87,14 @@ start_app(party_management = AppName) ->
                 accounter => <<"http://shumway:8022/shumpune">>,
                 automaton => <<"http://machinegun:8022/v1/automaton">>,
                 party_management => #{
-                    url => <<"http://party_management:8022/v1/processing/partymgmt">>,
+                    url => <<"http://party-management:8022/v1/processing/partymgmt">>,
                     transport_opts => #{
                         pool => party_management,
                         max_connections => 300
                     }
                 },
                 claim_committer => #{
-                    url => <<"http://party_management:8022/v1/processing/claim_committer">>,
+                    url => <<"http://party-management:8022/v1/processing/claim_committer">>,
                     transport_opts => #{
                         pool => claim_committer,
                         max_connections => 300
