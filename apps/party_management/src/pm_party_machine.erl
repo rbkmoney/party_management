@@ -536,7 +536,7 @@ get_aux_state(PartyID) ->
 get_revision_of_part(PartyID, Last, Step) ->
     {History, LastNext, StepNext} = get_history_part(PartyID, Last, Step),
     case find_revision_in_history(History) of
-        revision_not_found when Last == 0 ->
+        revision_not_found when LastNext == 0 ->
             0;
         revision_not_found ->
             get_revision_of_part(PartyID, LastNext, StepNext);
