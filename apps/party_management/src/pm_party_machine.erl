@@ -550,7 +550,7 @@ get_history_part(PartyID, Last, Step) ->
             {[], 0, 0};
         History ->
             {LastID, _, _} = lists:last(History),
-            {History, LastID, Step}
+            {History, LastID, Step * 2}
     end.
 
 find_revision_in_history([]) ->
