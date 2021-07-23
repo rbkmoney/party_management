@@ -12,7 +12,6 @@
 %%
 
 -export([head/0]).
--export([all/1]).
 -export([get/2]).
 -export([find/2]).
 -export([exists/2]).
@@ -70,7 +69,7 @@ extract_data({_Tag, {_Name, _Ref, Data}}) ->
 
 -spec commit(revision(), dmt_client:commit()) -> ok | no_return().
 commit(Revision, Commit) ->
-    Revision = dmt_client:commit(Revision, Commit) - 1,
+    _ = dmt_client:commit(Revision, Commit),
     ok.
 
 -spec insert(object() | [object()]) -> ok | no_return().
@@ -116,7 +115,7 @@ remove(Objects) ->
     },
     commit(head(), Commit).
 
--spec cleanup() -> ok | no_return().
+-spec cleanup() -> revision() | no_return().
 cleanup() ->
-    Domain = all(head()),
+    #'Snapshot'{domain = Domain} = dmt_client:checkout(latest),
     remove(maps:values(Domain)).
