@@ -37,11 +37,6 @@
 head() ->
     dmt_client:get_last_version().
 
--spec all(revision()) -> dmsl_domain_thrift:'Domain'().
-all(Revision) ->
-    #'Snapshot'{domain = Domain} = dmt_client:checkout(Revision),
-    Domain.
-
 -spec get(revision(), ref()) -> data() | no_return().
 get(Revision, Ref) ->
     try
@@ -76,7 +71,6 @@ extract_data({_Tag, {_Name, _Ref, Data}}) ->
 -spec commit(revision(), dmt_client:commit()) -> ok | no_return().
 commit(Revision, Commit) ->
     Revision = dmt_client:commit(Revision, Commit) - 1,
-    _ = pm_domain:all(Revision + 1),
     ok.
 
 -spec insert(object() | [object()]) -> ok | no_return().

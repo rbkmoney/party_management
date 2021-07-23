@@ -49,12 +49,12 @@ upsert(Revision, NewObjects) ->
 
 -spec reset(revision()) -> revision() | no_return().
 reset(ToRevision) ->
-    upsert(pm_domain:head(), maps:values(pm_domain:all(ToRevision))).
+    #'Snapshot'{domain = Domain} = dmt_client:checkout(ToRevision),
+    upsert(pm_domain:head(), maps:values(Domain)).
 
 -spec commit(revision(), dmt_client:commit()) -> ok | no_return().
 commit(Revision, Commit) ->
     Revision = dmt_client:commit(Revision, Commit) - 1,
-    _ = pm_domain:all(Revision + 1),
     ok.
 
 -spec with(object() | [object()], fun((revision()) -> R)) -> R | no_return().
