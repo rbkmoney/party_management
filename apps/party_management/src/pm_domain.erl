@@ -67,12 +67,11 @@ exists(Revision, Ref) ->
 extract_data({_Tag, {_Name, _Ref, Data}}) ->
     Data.
 
--spec commit(revision(), dmt_client:commit()) -> ok | no_return().
+-spec commit(revision(), dmt_client:commit()) -> revision() | no_return().
 commit(Revision, Commit) ->
-    _ = dmt_client:commit(Revision, Commit),
-    ok.
+    dmt_client:commit(Revision, Commit) .
 
--spec insert(object() | [object()]) -> ok | no_return().
+-spec insert(object() | [object()]) -> revision() | no_return().
 insert(Object) when not is_list(Object) ->
     insert([Object]);
 insert(Objects) ->
@@ -86,7 +85,7 @@ insert(Objects) ->
     },
     commit(head(), Commit).
 
--spec update(object() | [object()]) -> ok | no_return().
+-spec update(object() | [object()]) -> revision() | no_return().
 update(NewObject) when not is_list(NewObject) ->
     update([NewObject]);
 update(NewObjects) ->
@@ -103,7 +102,7 @@ update(NewObjects) ->
     },
     commit(Revision, Commit).
 
--spec remove([object()]) -> ok | no_return().
+-spec remove([object()]) -> revision() | no_return().
 remove(Objects) ->
     Commit = #'Commit'{
         ops = [
