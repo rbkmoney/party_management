@@ -69,7 +69,7 @@ extract_data({_Tag, {_Name, _Ref, Data}}) ->
 
 -spec commit(revision(), dmt_client:commit()) -> revision() | no_return().
 commit(Revision, Commit) ->
-    dmt_client:commit(Revision, Commit) .
+    dmt_client:commit(Revision, Commit).
 
 -spec insert(object() | [object()]) -> revision() | no_return().
 insert(Object) when not is_list(Object) ->
@@ -80,7 +80,7 @@ insert(Objects) ->
             {insert, #'InsertOp'{
                 object = Object
             }}
-         || Object <- Objects
+            || Object <- Objects
         ]
     },
     commit(head(), Commit).
@@ -96,8 +96,8 @@ update(NewObjects) ->
                 old_object = {Tag, {ObjectName, Ref, OldData}},
                 new_object = NewObject
             }}
-         || NewObject = {Tag, {ObjectName, Ref, _Data}} <- NewObjects,
-            OldData <- [get(Revision, {Tag, Ref})]
+            || NewObject = {Tag, {ObjectName, Ref, _Data}} <- NewObjects,
+               OldData <- [get(Revision, {Tag, Ref})]
         ]
     },
     commit(Revision, Commit).
@@ -109,7 +109,7 @@ remove(Objects) ->
             {remove, #'RemoveOp'{
                 object = Object
             }}
-         || Object <- Objects
+            || Object <- Objects
         ]
     },
     commit(head(), Commit).
