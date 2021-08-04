@@ -1,6 +1,5 @@
 -module(pm_msgpack_marshalling).
 
--include_lib("damsel/include/dmsl_msgpack_thrift.hrl").
 -include_lib("mg_proto/include/mg_proto_msgpack_thrift.hrl").
 
 %% API
@@ -26,7 +25,7 @@
 
 -spec marshal(msgpack_value()) -> dmsl_msgpack_thrift:'Value'().
 marshal(undefined) ->
-    {nl, #msgpack_Nil{}};
+    {nl, #mg_msgpack_Nil{}};
 marshal(Boolean) when is_boolean(Boolean) ->
     {b, Boolean};
 marshal(Integer) when is_integer(Integer) ->
@@ -50,7 +49,7 @@ marshal(Array) when is_list(Array) ->
     {arr, lists:map(fun marshal/1, Array)}.
 
 -spec unmarshal(dmsl_msgpack_thrift:'Value'()) -> msgpack_value().
-unmarshal({nl, #msgpack_Nil{}}) ->
+unmarshal({nl, #mg_msgpack_Nil{}}) ->
     undefined;
 unmarshal({b, Boolean}) ->
     Boolean;
