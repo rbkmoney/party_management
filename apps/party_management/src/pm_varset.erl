@@ -29,50 +29,39 @@ encode_varset(Varset) ->
         category = genlib_map:get(category, Varset),
         currency = genlib_map:get(currency, Varset),
         amount = genlib_map:get(cost, Varset),
+        payment_method = genlib_map:get(payment_method, Varset),
         payout_method = genlib_map:get(payout_method, Varset),
         wallet_id = genlib_map:get(wallet_id, Varset),
         p2p_tool = genlib_map:get(p2p_tool, Varset),
-        payment_tool = genlib_map:get(payment_tool, Varset),
+        shop_id = genlib_map:get(shop_id, Varset),
         identification_level = genlib_map:get(identification_level, Varset),
+        payment_tool = genlib_map:get(payment_tool, Varset),
         party_id = genlib_map:get(party_id, Varset),
-        shop_id = genlib_map:get(shop_id, Varset)
+        bin_data = genlib_map:get(bin_data, Varset)
     }.
 
+-spec decode_varset(encoded_varset()) -> varset().
+decode_varset(Varset) ->
+    decode_varset(Varset, #{}).
 -spec decode_varset(encoded_varset(), varset()) -> varset().
 decode_varset(Varset, VS) ->
     VS#{
         category => Varset#payproc_Varset.category,
         currency => Varset#payproc_Varset.currency,
         cost => Varset#payproc_Varset.amount,
+        payment_method => Varset#payproc_Varset.payment_method,
+        payout_method => Varset#payproc_Varset.payout_method,
+        wallet_id => Varset#payproc_Varset.wallet_id,
+        p2p_tool => Varset#payproc_Varset.p2p_tool,
+        shop_id => Varset#payproc_Varset.shop_id,
+        identification_level => Varset#payproc_Varset.identification_level,
         payment_tool => prepare_payment_tool_var(
             Varset#payproc_Varset.payment_method,
             Varset#payproc_Varset.payment_tool
         ),
-        payout_method => Varset#payproc_Varset.payout_method,
-        wallet_id => Varset#payproc_Varset.wallet_id,
-        p2p_tool => Varset#payproc_Varset.p2p_tool,
-        identification_level => Varset#payproc_Varset.identification_level,
-        shop_id => Varset#payproc_Varset.shop_id,
-        party_id => Varset#payproc_Varset.party_id
+        party_id => Varset#payproc_Varset.party_id,
+        bin_data => Varset#payproc_Varset.bin_data
     }.
-
--spec decode_varset(encoded_varset()) -> varset().
-decode_varset(Varset) ->
-    genlib_map:compact(#{
-        category => Varset#payproc_Varset.category,
-        currency => Varset#payproc_Varset.currency,
-        cost => Varset#payproc_Varset.amount,
-        payment_tool => prepare_payment_tool_var(
-            Varset#payproc_Varset.payment_method,
-            Varset#payproc_Varset.payment_tool
-        ),
-        payout_method => Varset#payproc_Varset.payout_method,
-        wallet_id => Varset#payproc_Varset.wallet_id,
-        p2p_tool => Varset#payproc_Varset.p2p_tool,
-        identification_level => Varset#payproc_Varset.identification_level,
-        shop_id => Varset#payproc_Varset.shop_id,
-        party_id => Varset#payproc_Varset.party_id
-    }).
 
 prepare_payment_tool_var(_PaymentMethodRef, PaymentTool) when PaymentTool /= undefined ->
     PaymentTool;
@@ -96,11 +85,7 @@ encode_decode_test() ->
             amount = 20,
             currency = #domain_CurrencyRef{symbolic_code = <<"RUB">>}
         },
-        payment_tool =>
-            {digital_wallet, #domain_DigitalWallet{
-                provider_deprecated = qiwi,
-                id = <<"digital_wallet_id">>
-            }},
+        payment_method => #domain_PaymentMethodRef{id = any},
         payout_method => #domain_PayoutMethodRef{id = any},
         wallet_id => <<"wallet_id">>,
         p2p_tool => #domain_P2PTool{
@@ -115,9 +100,18 @@ encode_decode_test() ->
                     id = <<"digital_wallet_id">>
                 }}
         },
-        identification_level => full,
         shop_id => <<"shop_id">>,
-        party_id => <<"party_id">>
+        identification_level => full,
+        payment_tool =>
+            {digital_wallet, #domain_DigitalWallet{
+                provider_deprecated = qiwi,
+                id = <<"digital_wallet_id">>
+            }},
+        party_id => <<"party_id">>,
+        bin_data => #domain_BinData{
+            payment_system = <<"payment_system">>,
+            bank_name = <<"bank_name">>
+        }
     },
     Varset = decode_varset(encode_varset(Varset)).
 

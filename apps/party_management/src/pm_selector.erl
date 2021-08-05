@@ -156,6 +156,7 @@ reduce_condition(C, VS, Rev) ->
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 
 -spec test() -> _.
 
@@ -237,5 +238,29 @@ p2p_allow_test() ->
     VS2 = FunGenVS(visa, visa),
     Allow2 = reduce_predicate(Predicate, VS2, 1),
     ?assertEqual({constant, true}, Allow2).
+
+-spec bin_data_allow_test() -> _.
+bin_data_allow_test() ->
+    VS = pm_varset:decode_varset(#payproc_Varset{
+        bin_data = #domain_BinData{
+            payment_system = <<"payment_system">>,
+            bank_name = <<"bank_name">>
+        }
+    }),
+    CondFun = fun(PS, BN) ->
+        {any_of, [
+            {condition,
+                {bin_data, #domain_BinDataCondition{
+                    payment_system = PS,
+                    bank_name = BN
+                }}}
+        ]}
+    end,
+
+    ?assertEqual(?const(true), reduce_predicate(CondFun({matches, <<"pay">>}, {matches, <<"ban">>}), VS, 1)),
+    ?assertEqual(?const(true), reduce_predicate(CondFun({matches, <<"_system">>}, {matches, <<"_name">>}), VS, 1)),
+    ?assertEqual(?const(false), reduce_predicate(CondFun({equals, <<"system">>}, undefined), VS, 1)),
+    ?assertEqual(?const(false), reduce_predicate(CondFun(undefined, {equals, <<"bank">>}), VS, 1)),
+    ?assertEqual(?const(true), reduce_predicate(CondFun(undefined, undefined), VS, 1)).
 
 -endif.
