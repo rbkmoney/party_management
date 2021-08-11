@@ -8,7 +8,6 @@
 -export([some_defined/1]).
 -export([ternary_and/1]).
 -export([ternary_or/1]).
--export([ternary_with_defined/1]).
 
 %%
 -export_type([ternary_term/0]).
@@ -113,6 +112,14 @@ test_string_condition({equals, String1}, String2) ->
 some_defined(List) ->
     genlib_list:compact(List) /= [].
 
+%% Ternary AND
+%% Truth-table
+%%   T U F
+%% T T U F
+%% U U U F
+%% F F F F
+%% Empty list is undefined
+%% Lazily-evaluated if applicable
 -spec ternary_and([ternary_term()]) -> ternary_value().
 ternary_and([]) ->
     undefined;
@@ -128,6 +135,14 @@ ternary_and(List) ->
         List
     ).
 
+%% Ternary OR
+%% Truth-table
+%%   T U F
+%% T T T T
+%% U T U U
+%% F T U F
+%% Empty list is undefined
+%% Lazily-evaluated if applicable
 -spec ternary_or([ternary_term()]) -> ternary_value().
 ternary_or([]) ->
     undefined;
@@ -157,22 +172,76 @@ ternary_or(MaybeLeftTrue, MaybeRightTrue) when MaybeLeftTrue == true; MaybeRight
 ternary_or(MaybeLeftUndef, MaybeRightUndef) when MaybeLeftUndef == undefined; MaybeRightUndef == undefined ->
     undefined.
 
--spec ternary_with_defined([ternary_term()]) -> ternary_value().
-ternary_with_defined(Terms) ->
-    genlib_list:foldl_while(
-        fun(Term, _) ->
-            case compute_term(Term) of
-                true -> {cont, true};
-                Result -> {halt, Result}
-            end
-        end,
-        undefined,
-        Terms
-    ).
-
 compute_term(Fun) when is_function(Fun, 0) -> to_ternary_bool(Fun());
 compute_term(Term) -> to_ternary_bool(Term).
 
 to_ternary_bool(Bool) when is_boolean(Bool) -> Bool;
 to_ternary_bool(undefined) -> undefined;
 to_ternary_bool(_) -> true.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+-spec test() -> _.
+
+-spec some_defined_empty_test() -> _.
+some_defined_empty_test() ->
+    ?assertEqual(false, some_defined([])).
+
+-spec some_defined_undefined_test() -> _.
+some_defined_undefined_test() ->
+    ?assertEqual(false, some_defined([undefined, undefined, undefined])).
+
+-spec some_defined_defined_test() -> _.
+some_defined_defined_test() ->
+    ?assertEqual(true, some_defined([undefined, undefined, true])).
+
+-spec ternary_and_empty_args_test() -> _.
+ternary_and_empty_args_test() ->
+    ?assertEqual(undefined, ternary_and([])).
+
+-spec ternary_and_truth_table_test() -> _.
+ternary_and_truth_table_test() ->
+    Table = [
+        {true, true, true},
+        {true, undefined, undefined},
+        {true, false, false},
+        {undefined, true, undefined},
+        {undefined, undefined, undefined},
+        {undefined, false, false},
+        {false, true, false},
+        {false, undefined, false},
+        {false, false, false}
+    ],
+    lists:foreach(
+        fun({L, R, Result}) ->
+            ?assertEqual(Result, ternary_and([L, R]))
+        end,
+        Table
+    ).
+
+-spec ternary_or_empty_args_test() -> _.
+ternary_or_empty_args_test() ->
+    ?assertEqual(undefined, ternary_or([])).
+
+-spec ternary_or_truth_table_test() -> _.
+ternary_or_truth_table_test() ->
+    Table = [
+        {true, true, true},
+        {true, undefined, true},
+        {true, false, true},
+        {undefined, true, true},
+        {undefined, undefined, undefined},
+        {undefined, false, undefined},
+        {false, true, true},
+        {false, undefined, undefined},
+        {false, false, false}
+    ],
+    lists:foreach(
+        fun({L, R, Result}) ->
+            ?assertEqual(Result, ternary_or([L, R]))
+        end,
+        Table
+    ).
+
+-endif.
