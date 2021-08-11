@@ -281,7 +281,7 @@ reduce(
             ),
             list_to_tuple([Name | Fields]);
         false ->
-            case re:run(atom_to_binary(Name), <<"Selector$">>) of
+            case re:run(atom_to_binary(Name), <<"Selector$">>) /= nomatch of
                 true ->
                     pm_selector:reduce(Terms, VS, Revision);
                 false ->
