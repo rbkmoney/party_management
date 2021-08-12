@@ -85,7 +85,7 @@ encode_decode_test() ->
             amount = 20,
             currency = #domain_CurrencyRef{symbolic_code = <<"RUB">>}
         },
-        payment_method => #domain_PaymentMethodRef{id = any},
+        payment_method => #domain_PaymentMethodRef{id = {bank_card_deprecated, visa}},
         payout_method => #domain_PayoutMethodRef{id = any},
         wallet_id => <<"wallet_id">>,
         p2p_tool => #domain_P2PTool{
