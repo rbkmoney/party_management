@@ -15,7 +15,7 @@
 -type method() :: dmsl_domain_thrift:'PaymentMethodRef'().
 -type condition() :: dmsl_domain_thrift:'PaymentToolCondition'().
 
--import(pm_condition, [some_defined/1, ternary_and/1]).
+-import(pm_condition, [some_defined/1, ternary_and/1, ternary_while/1]).
 
 -spec create_from_method(method()) -> t().
 %% TODO empty strings - ugly hack for dialyzar
@@ -182,11 +182,11 @@ test_payment_system_condition(
         TpIs == undefined orelse TpIs == Tp,
         PsLegacyIs == undefined orelse PsLegacyIs == PsLegacy,
         TpLegacyIs == undefined orelse TpLegacyIs == TpLegacy,
-        TmIs == undefined orelse ternary_and([Tm, TmIs == Tm])
+        TmIs == undefined orelse ternary_while([Tm, TmIs == Tm])
     ]).
 
 test_issuer_country_condition(Country, #domain_BankCard{issuer_country = TargetCountry}, _Rev) ->
-    ternary_and([TargetCountry, Country == TargetCountry]).
+    ternary_while([TargetCountry, Country == TargetCountry]).
 
 test_issuer_bank_condition(BankRef, #domain_BankCard{bank_name = BankName, bin = BIN}, Rev) ->
     #domain_Bank{binbase_id_patterns = Patterns, bins = BINs} = pm_domain:get(Rev, {bank, BankRef}),

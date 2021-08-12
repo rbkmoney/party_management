@@ -8,6 +8,7 @@
 -export([some_defined/1]).
 -export([ternary_and/1]).
 -export([ternary_or/1]).
+-export([ternary_while/1]).
 
 %%
 -export_type([ternary_term/0]).
@@ -158,6 +159,30 @@ ternary_or(List) ->
         List
     ).
 
+%% Similar to Ternary AND, but stops on any non-true value
+%% Useful for calculating applications with possibly-defined dependencies, like:
+%% ternary_while([Arg1, Arg2, fun () -> fn(Arg1, Arg2) end])
+%% Truth-table
+%%   T U F
+%% T T U F
+%% U U U U
+%% F F F F
+%% (T if all arguments are T, first non-T arg otherwise)
+%% Empty list is undefined
+%% Lazily-evaluated if applicable
+-spec ternary_while([ternary_term()]) -> ternary_value().
+ternary_while(Terms) ->
+    genlib_list:foldl_while(
+        fun(Term, _) ->
+            case compute_term(Term) of
+                true -> {cont, true};
+                Result -> {halt, Result}
+            end
+        end,
+        undefined,
+        Terms
+    ).
+
 ternary_and(true, true) ->
     true;
 ternary_and(MaybeLeftFalse, MaybeRightFalse) when MaybeLeftFalse == false; MaybeRightFalse == false ->
@@ -240,6 +265,26 @@ ternary_or_truth_table_test() ->
     lists:foreach(
         fun({L, R, Result}) ->
             ?assertEqual(Result, ternary_or([L, R]))
+        end,
+        Table
+    ).
+
+-spec ternary_while_truth_table_test() -> _.
+ternary_while_truth_table_test() ->
+    Table = [
+        {true, true, true},
+        {true, undefined, undefined},
+        {true, false, false},
+        {undefined, true, undefined},
+        {undefined, undefined, undefined},
+        {undefined, false, undefined},
+        {false, true, false},
+        {false, undefined, false},
+        {false, false, false}
+    ],
+    lists:foreach(
+        fun({L, R, Result}) ->
+            ?assertEqual(Result, ternary_while([L, R]))
         end,
         Table
     ).
