@@ -12,17 +12,18 @@
     category => dmsl_domain_thrift:'CategoryRef'(),
     currency => dmsl_domain_thrift:'CurrencyRef'(),
     cost => dmsl_domain_thrift:'Cash'(),
-    payment_tool => dmsl_domain_thrift:'PaymentTool'(),
-    party_id => dmsl_domain_thrift:'PartyID'(),
-    shop_id => dmsl_domain_thrift:'ShopID'(),
+    payment_method => dmsl_domain_thrift:'PaymentMethodRef'(),
     payout_method => dmsl_domain_thrift:'PayoutMethodRef'(),
     wallet_id => dmsl_domain_thrift:'WalletID'(),
+    p2p_tool => dmsl_domain_thrift:'P2PTool'(),
+    shop_id => dmsl_domain_thrift:'ShopID'(),
     identification_level => dmsl_domain_thrift:'ContractorIdentificationLevel'(),
-    p2p_tool => dmsl_domain_thrift:'P2PTool'()
+    payment_tool => dmsl_domain_thrift:'PaymentTool'(),
+    party_id => dmsl_domain_thrift:'PartyID'(),
+    bin_data => dmsl_domain_thrift:'BinData'()
 }.
 
 -type encoded_varset() :: dmsl_payment_processing_thrift:'Varset'().
-
 -spec encode_varset(varset()) -> encoded_varset().
 encode_varset(Varset) ->
     #payproc_Varset{
@@ -76,7 +77,6 @@ prepare_payment_tool_var(undefined, undefined) ->
 -spec test() -> _.
 
 -spec encode_decode_test() -> _.
-
 encode_decode_test() ->
     Varset = #{
         category => #domain_CategoryRef{id = 1},
