@@ -45,7 +45,7 @@ decode_varset(Varset) ->
     decode_varset(Varset, #{}).
 -spec decode_varset(encoded_varset(), varset()) -> varset().
 decode_varset(Varset, VS) ->
-    VS#{
+    genlib_map:compact(VS#{
         category => Varset#payproc_Varset.category,
         currency => Varset#payproc_Varset.currency,
         cost => Varset#payproc_Varset.amount,
@@ -61,7 +61,7 @@ decode_varset(Varset, VS) ->
         ),
         party_id => Varset#payproc_Varset.party_id,
         bin_data => Varset#payproc_Varset.bin_data
-    }.
+    }).
 
 prepare_payment_tool_var(_PaymentMethodRef, PaymentTool) when PaymentTool /= undefined ->
     PaymentTool;
