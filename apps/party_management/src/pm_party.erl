@@ -373,7 +373,7 @@ find_shop_account(ID, [{_, #domain_Shop{account = Account}} | Rest]) ->
 %% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
 is_terms(Struct) ->
     lists:member(
-        Name = element(1, Terms),
+        element(1, Struct),
         [
             domain_TermSet,
             domain_PaymentsServiceTerms,
@@ -394,7 +394,7 @@ is_terms(Struct) ->
     ).
 
 is_selector(Struct) ->
-    lists:member(element(1, Terms), [
+    lists:member(element(1, Struct), [
         domain_CategorySelector,
         domain_PayoutMethodSelector,
         domain_PaymentMethodSelector,
