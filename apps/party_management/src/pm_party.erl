@@ -241,25 +241,6 @@ ensure_shop(#domain_Shop{} = Shop) ->
 ensure_shop(undefined) ->
     throw(#payproc_ShopNotFound{}).
 
-%% Structs, that are not atomic (can be viewed as maps with independent fields and therefore, deep-merged)
--define(TRANSPARENT_STRUCTS, [
-    domain_TermSet,
-    domain_PaymentsServiceTerms,
-    domain_RecurrentPaytoolsServiceTerms,
-    domain_PaymentHoldsServiceTerms,
-    domain_PaymentRefundsServiceTerms,
-    domain_PartialRefundsServiceTerms,
-    domain_PaymentChargebackServiceTerms,
-    domain_PayoutsServiceTerms,
-    domain_ReportsServiceTerms,
-    domain_ServiceAcceptanceActsTerms,
-    domain_WalletServiceTerms,
-    domain_WithdrawalServiceTerms,
-    domain_P2PServiceTerms,
-    domain_P2PTemplateServiceTerms,
-    domain_W2WServiceTerms
-]).
-
 reduce_terms(Terms, VS, Revision) ->
     reduce(Terms, VS, Revision).
 
@@ -271,22 +252,23 @@ reduce(
     VS,
     Revision
 ) when is_tuple(Terms) ->
-    Name = element(1, Terms),
     %% If only "if" supported arbitary function call...
-    case lists:member(Name, ?TRANSPARENT_STRUCTS) of
+    case is_terms(Terms) of
         true ->
+            Name = element(1, Terms),
             Fields = lists:map(
                 fun(Idx) -> reduce_terms(element(Idx, Terms), VS, Revision) end,
                 lists:seq(2, tuple_size(Terms))
             ),
             list_to_tuple([Name | Fields]);
         false ->
-            case re:run(atom_to_binary(Name), <<"Selector$">>) /= nomatch of
+            case is_selector(Terms) of
                 true ->
                     pm_selector:reduce(Terms, VS, Revision);
                 false ->
                     case is_predicate(Terms) of
-                        true -> pm_selector:reduce_predicate(Terms, VS, Revision)
+                        true -> pm_selector:reduce_predicate(Terms, VS, Revision);
+                        false -> error({unknown_reducee, Terms})
                     end
             end
     end.
@@ -350,11 +332,11 @@ merge_terms(Left, undefined) ->
 merge_terms(undefined, Right) ->
     Right;
 merge_terms(Left, Right) when element(1, Left) == element(1, Right), tuple_size(Left) == tuple_size(Right) ->
-    Name = element(1, Left),
-    case lists:member(Name, ?TRANSPARENT_STRUCTS) of
+    case is_terms(Left) of
         false ->
             Left;
         true ->
+            Name = element(1, Left),
             Fields =
                 lists:map(
                     fun(Idx) -> merge_terms(element(Idx, Left), element(Idx, Right)) end,
@@ -386,6 +368,43 @@ find_shop_account(ID, [{_, #domain_Shop{account = Account}} | Rest]) ->
         _ ->
             find_shop_account(ID, Rest)
     end.
+
+%% Is it a non-atomic struct
+%% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
+is_terms(Struct) ->
+    lists:member(
+        Name = element(1, Terms),
+        [
+            domain_TermSet,
+            domain_PaymentsServiceTerms,
+            domain_RecurrentPaytoolsServiceTerms,
+            domain_PaymentHoldsServiceTerms,
+            domain_PaymentRefundsServiceTerms,
+            domain_PartialRefundsServiceTerms,
+            domain_PaymentChargebackServiceTerms,
+            domain_PayoutsServiceTerms,
+            domain_ReportsServiceTerms,
+            domain_ServiceAcceptanceActsTerms,
+            domain_WalletServiceTerms,
+            domain_WithdrawalServiceTerms,
+            domain_P2PServiceTerms,
+            domain_P2PTemplateServiceTerms,
+            domain_W2WServiceTerms
+        ]
+    ).
+
+is_selector(Struct) ->
+    lists:member(element(1, Terms), [
+        domain_CategorySelector,
+        domain_PayoutMethodSelector,
+        domain_PaymentMethodSelector,
+        domain_FeeSelector,
+        domain_CurrencySelector,
+        domain_TimeSpanSelector,
+        domain_LifetimeSelector,
+        domain_CashFlowSelector,
+        domain_ProviderSelector
+    ]).
 
 %% Asserts
 %% TODO there should be more concise way to express these assertions in terms of preconditions
