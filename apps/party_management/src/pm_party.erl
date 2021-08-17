@@ -278,6 +278,33 @@ is_predicate({Variant, _Data}) ->
 is_predicate(_) ->
     false.
 
+%% Is it a non-atomic struct
+%% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
+is_terms(Struct) ->
+    lists:member(
+        element(1, Struct),
+        [
+            domain_TermSet,
+            domain_PaymentsServiceTerms,
+            domain_RecurrentPaytoolsServiceTerms,
+            domain_PaymentHoldsServiceTerms,
+            domain_PaymentRefundsServiceTerms,
+            domain_PartialRefundsServiceTerms,
+            domain_PaymentChargebackServiceTerms,
+            domain_PayoutsServiceTerms,
+            domain_ReportsServiceTerms,
+            domain_ServiceAcceptanceActsTerms,
+            domain_WalletServiceTerms,
+            domain_WithdrawalServiceTerms,
+            domain_P2PServiceTerms,
+            domain_P2PTemplateServiceTerms,
+            domain_W2WServiceTerms
+        ]
+    ).
+
+is_selector(Struct) ->
+    lists:member(Struct, [decisions, value]).
+
 compute_terms(#domain_Contract{terms = TermsRef, adjustments = Adjustments}, Timestamp, Revision) ->
     ActiveAdjustments = lists:filter(fun(A) -> is_adjustment_active(A, Timestamp) end, Adjustments),
     % Adjustments are ordered from oldest to newest
@@ -368,43 +395,6 @@ find_shop_account(ID, [{_, #domain_Shop{account = Account}} | Rest]) ->
         _ ->
             find_shop_account(ID, Rest)
     end.
-
-%% Is it a non-atomic struct
-%% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
-is_terms(Struct) ->
-    lists:member(
-        element(1, Struct),
-        [
-            domain_TermSet,
-            domain_PaymentsServiceTerms,
-            domain_RecurrentPaytoolsServiceTerms,
-            domain_PaymentHoldsServiceTerms,
-            domain_PaymentRefundsServiceTerms,
-            domain_PartialRefundsServiceTerms,
-            domain_PaymentChargebackServiceTerms,
-            domain_PayoutsServiceTerms,
-            domain_ReportsServiceTerms,
-            domain_ServiceAcceptanceActsTerms,
-            domain_WalletServiceTerms,
-            domain_WithdrawalServiceTerms,
-            domain_P2PServiceTerms,
-            domain_P2PTemplateServiceTerms,
-            domain_W2WServiceTerms
-        ]
-    ).
-
-is_selector(Struct) ->
-    lists:member(element(1, Struct), [
-        domain_CategorySelector,
-        domain_PayoutMethodSelector,
-        domain_PaymentMethodSelector,
-        domain_FeeSelector,
-        domain_CurrencySelector,
-        domain_TimeSpanSelector,
-        domain_LifetimeSelector,
-        domain_CashFlowSelector,
-        domain_ProviderSelector
-    ]).
 
 %% Asserts
 %% TODO there should be more concise way to express these assertions in terms of preconditions
