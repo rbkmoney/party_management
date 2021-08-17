@@ -957,7 +957,8 @@ check_all_payment_methods(C) ->
                 ?pinst(2),
                 #payproc_Varset{payment_method = ?pmt(Type, Object)},
                 Client
-            )
+            ),
+        ok
     end,
 
     TermsFun(bank_card, ?bank_card(<<"visa-ref">>)),
