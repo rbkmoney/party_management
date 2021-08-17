@@ -22,20 +22,24 @@
 create_from_method(#domain_PaymentMethodRef{
     id =
         {bank_card, #domain_BankCardPaymentMethod{
-            payment_system_deprecated = PaymentSystem,
+            payment_system = PaymentSystem,
             is_cvv_empty = IsCVVEmpty,
-            token_provider_deprecated = TokenProvider,
-            tokenization_method = TokenizationMethod
+            payment_token = PaymentToken,
+            tokenization_method = TokenizationMethod,
+            payment_system_deprecated = PaymentSystemLegacy,
+            token_provider_deprecated = TokenProvider
         }}
 }) ->
     {bank_card, #domain_BankCard{
-        payment_system_deprecated = PaymentSystem,
         token = <<"">>,
+        payment_system = PaymentSystem,
         bin = <<"">>,
         last_digits = <<"">>,
-        token_provider_deprecated = TokenProvider,
+        payment_token = PaymentToken,
+        tokenization_method = TokenizationMethod,
         is_cvv_empty = IsCVVEmpty,
-        tokenization_method = TokenizationMethod
+        payment_system_deprecated = PaymentSystemLegacy,
+        token_provider_deprecated = TokenProvider
     }};
 create_from_method(#domain_PaymentMethodRef{id = {payment_terminal, Ref}}) ->
     {payment_terminal, #domain_PaymentTerminal{payment_service = Ref}};
@@ -71,18 +75,22 @@ create_from_method(#domain_PaymentMethodRef{id = {digital_wallet_deprecated, Pro
 create_from_method(#domain_PaymentMethodRef{
     id =
         {tokenized_bank_card_deprecated, #domain_TokenizedBankCard{
-            payment_system_deprecated = PaymentSystem,
-            token_provider_deprecated = TokenProvider,
-            tokenization_method = TokenizationMethod
+            payment_system = PaymentSystem,
+            payment_token = PaymentToken,
+            tokenization_method = TokenizationMethod,
+            payment_system_deprecated = PaymentSystemLegacy,
+            token_provider_deprecated = TokenProvider
         }}
 }) ->
     {bank_card, #domain_BankCard{
-        payment_system_deprecated = PaymentSystem,
         token = <<"">>,
+        payment_system = PaymentSystem,
         bin = <<"">>,
         last_digits = <<"">>,
-        token_provider_deprecated = TokenProvider,
-        tokenization_method = TokenizationMethod
+        payment_token = PaymentToken,
+        tokenization_method = TokenizationMethod,
+        payment_system_deprecated = PaymentSystemLegacy,
+        token_provider_deprecated = TokenProvider
     }};
 create_from_method(#domain_PaymentMethodRef{id = {empty_cvv_bank_card_deprecated, PaymentSystem}}) ->
     {bank_card, #domain_BankCard{
