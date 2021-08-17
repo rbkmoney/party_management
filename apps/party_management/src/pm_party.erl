@@ -302,8 +302,10 @@ is_terms(Struct) ->
         ]
     ).
 
-is_selector(Struct) ->
-    lists:member(Struct, [decisions, value]).
+is_selector({Variant, _Data}) ->
+    lists:member(Variant, [decisions, value]);
+is_selector(_) ->
+    false.
 
 compute_terms(#domain_Contract{terms = TermsRef, adjustments = Adjustments}, Timestamp, Revision) ->
     ActiveAdjustments = lists:filter(fun(A) -> is_adjustment_active(A, Timestamp) end, Adjustments),
