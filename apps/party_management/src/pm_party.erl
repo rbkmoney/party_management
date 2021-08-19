@@ -273,39 +273,57 @@ reduce(
             end
     end.
 
-is_predicate({Variant, _Data}) ->
-    lists:member(Variant, [constant, condition, is_not, all_of, any_of, criterion]);
-is_predicate(_) ->
-    false.
+is_predicate(Struct) ->
+    case Struct of
+        {S, _Data} when
+            S == constant;
+            S == condition;
+            S == is_not;
+            S == all_of;
+            S == any_of;
+            S == criterion
+        ->
+            true;
+        _ ->
+            false
+    end.
 
 %% Is it a non-atomic struct
 %% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
 is_terms(Struct) ->
-    lists:member(
-        element(1, Struct),
-        [
-            domain_TermSet,
-            domain_PaymentsServiceTerms,
-            domain_RecurrentPaytoolsServiceTerms,
-            domain_PaymentHoldsServiceTerms,
-            domain_PaymentRefundsServiceTerms,
-            domain_PartialRefundsServiceTerms,
-            domain_PaymentChargebackServiceTerms,
-            domain_PayoutsServiceTerms,
-            domain_ReportsServiceTerms,
-            domain_ServiceAcceptanceActsTerms,
-            domain_WalletServiceTerms,
-            domain_WithdrawalServiceTerms,
-            domain_P2PServiceTerms,
-            domain_P2PTemplateServiceTerms,
-            domain_W2WServiceTerms
-        ]
-    ).
+    case element(1, Struct) of
+        S when
+            S == domain_TermSet;
+            S == domain_PaymentsServiceTerms;
+            S == domain_RecurrentPaytoolsServiceTerms;
+            S == domain_PaymentHoldsServiceTerms;
+            S == domain_PaymentRefundsServiceTerms;
+            S == domain_PartialRefundsServiceTerms;
+            S == domain_PaymentChargebackServiceTerms;
+            S == domain_PayoutsServiceTerms;
+            S == domain_ReportsServiceTerms;
+            S == domain_ServiceAcceptanceActsTerms;
+            S == domain_WalletServiceTerms;
+            S == domain_WithdrawalServiceTerms;
+            S == domain_P2PServiceTerms;
+            S == domain_P2PTemplateServiceTerms;
+            S == domain_W2WServiceTerm
+        ->
+            true;
+        _ ->
+            false
+    end.
 
-is_selector({Variant, _Data}) ->
-    lists:member(Variant, [decisions, value]);
-is_selector(_) ->
-    false.
+is_selector(Struct) ->
+    case Struct of
+        {S, _Data} when
+            S == decisions;
+            S == value
+        ->
+            true;
+        _ ->
+            false
+    end.
 
 compute_terms(#domain_Contract{terms = TermsRef, adjustments = Adjustments}, Timestamp, Revision) ->
     ActiveAdjustments = lists:filter(fun(A) -> is_adjustment_active(A, Timestamp) end, Adjustments),
