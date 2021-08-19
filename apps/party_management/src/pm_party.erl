@@ -291,27 +291,23 @@ is_predicate(Struct) ->
 %% Is it a non-atomic struct
 %% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
 is_terms(Struct) ->
-    case element(1, Struct) of
-        S when
-            S == domain_TermSet;
-            S == domain_PaymentsServiceTerms;
-            S == domain_RecurrentPaytoolsServiceTerms;
-            S == domain_PaymentHoldsServiceTerms;
-            S == domain_PaymentRefundsServiceTerms;
-            S == domain_PartialRefundsServiceTerms;
-            S == domain_PaymentChargebackServiceTerms;
-            S == domain_PayoutsServiceTerms;
-            S == domain_ReportsServiceTerms;
-            S == domain_ServiceAcceptanceActsTerms;
-            S == domain_WalletServiceTerms;
-            S == domain_WithdrawalServiceTerms;
-            S == domain_P2PServiceTerms;
-            S == domain_P2PTemplateServiceTerms;
-            S == domain_W2WServiceTerms
-        ->
-            true;
-        _ ->
-            false
+    case Struct of
+        #domain_TermSet{} -> true;
+        #domain_PaymentsServiceTerms{} -> true;
+        #domain_RecurrentPaytoolsServiceTerms{} -> true;
+        #domain_PaymentHoldsServiceTerms{} -> true;
+        #domain_PaymentRefundsServiceTerms{} -> true;
+        #domain_PartialRefundsServiceTerms{} -> true;
+        #domain_PaymentChargebackServiceTerms{} -> true;
+        #domain_PayoutsServiceTerms{} -> true;
+        #domain_ReportsServiceTerms{} -> true;
+        #domain_ServiceAcceptanceActsTerms{} -> true;
+        #domain_WalletServiceTerms{} -> true;
+        #domain_WithdrawalServiceTerms{} -> true;
+        #domain_P2PServiceTerms{} -> true;
+        #domain_P2PTemplateServiceTerms{} -> true;
+        #domain_W2WServiceTerms{} -> true;
+        _ -> false
     end.
 
 is_selector(Struct) ->
