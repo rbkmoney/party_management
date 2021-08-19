@@ -255,22 +255,10 @@ test_digital_wallet_condition_def(
 test_crypto_currency_condition(#domain_CryptoCurrencyCondition{definition = Def}, V, Rev) ->
     Def =:= undefined orelse test_crypto_currency_condition_def(Def, V, Rev).
 
-test_crypto_currency_condition_def(CIs, C, Rev) ->
-    C1 =
-        case CIs of
-            {crypto_currency_is, CIsRef} ->
-                crypto_currency_to_name({ref, CIsRef}, Rev);
-            {crypto_currency_is_deprecated, CIsName} ->
-                crypto_currency_to_name({legacy, CIsName}, Rev)
-        end,
-    C2 = crypto_currency_to_name(C, Rev),
+test_crypto_currency_condition_def({crypto_currency_is, C1}, {ref, C2}, _Rev) ->
+    C1 =:= C2;
+test_crypto_currency_condition_def({crypto_currency_is_deprecated, C1}, {legacy, C2}, _Rev) ->
     C1 =:= C2.
-
-crypto_currency_to_name({ref, Ref}, Rev) ->
-    #domain_CryptoCurrency{name = Name} = pm_domain:get(Rev, {crypto_currency, Ref}),
-    string:lowercase(Name);
-crypto_currency_to_name({legacy, SymbolName}, _Rev) ->
-    atom_to_binary(SymbolName).
 
 test_mobile_commerce_condition(#domain_MobileCommerceCondition{definition = Def}, V, Rev) ->
     Def =:= undefined orelse test_mobile_commerce_condition_def(Def, V, Rev).
