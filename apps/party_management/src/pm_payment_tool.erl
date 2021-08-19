@@ -262,7 +262,6 @@ test_crypto_currency_condition_def({crypto_currency_is_deprecated, C1}, {legacy,
 test_crypto_currency_condition_def(_Cond, _Data, _Rev) ->
     undefined.
 
-
 test_mobile_commerce_condition(#domain_MobileCommerceCondition{definition = Def}, V, Rev) ->
     Def =:= undefined orelse test_mobile_commerce_condition_def(Def, V, Rev).
 
