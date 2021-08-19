@@ -307,7 +307,7 @@ is_terms(Struct) ->
             S == domain_WithdrawalServiceTerms;
             S == domain_P2PServiceTerms;
             S == domain_P2PTemplateServiceTerms;
-            S == domain_W2WServiceTerm
+            S == domain_W2WServiceTerms
         ->
             true;
         _ ->
