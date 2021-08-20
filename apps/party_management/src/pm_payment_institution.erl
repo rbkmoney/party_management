@@ -66,6 +66,11 @@ reduce_payment_institution(PaymentInstitution, VS, Revision) ->
             PaymentInstitution#domain_PaymentInstitution.providers,
             VS,
             Revision
+        ),
+        payment_system = reduce_if_defined(
+            PaymentInstitution#domain_PaymentInstitution.payment_system,
+            VS,
+            Revision
         )
     }.
 
