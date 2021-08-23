@@ -241,10 +241,10 @@ ensure_shop(#domain_Shop{} = Shop) ->
 ensure_shop(undefined) ->
     throw(#payproc_ShopNotFound{}).
 
+-spec reduce_terms(dmsl_domain_thrift:'TermSet'(), pm_selector:varset(), revision()) -> dmsl_domain_thrift:'TermSet'().
 reduce_terms(Terms, VS, Revision) ->
     reduce(Terms, VS, Revision).
 
--spec reduce_terms(dmsl_domain_thrift:'TermSet'(), pm_selector:varset(), revision()) -> dmsl_domain_thrift:'TermSet'().
 reduce(undefined, _VS, _Revision) ->
     undefined;
 reduce(
