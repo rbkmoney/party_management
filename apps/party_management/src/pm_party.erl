@@ -362,10 +362,6 @@ get_active_term_set(TimedTermSets, Timestamp) ->
 merge_terms(TermSets) when is_list(TermSets) ->
     lists:foldl(fun merge_terms/2, undefined, TermSets).
 
-merge_terms(Left, undefined) ->
-    Left;
-merge_terms(undefined, Right) ->
-    Right;
 merge_terms(Left, Right) when element(1, Left) == element(1, Right), tuple_size(Left) == tuple_size(Right) ->
     case is_terms(Left) of
         false ->
@@ -379,6 +375,8 @@ merge_terms(Left, Right) when element(1, Left) == element(1, Right), tuple_size(
                 ),
             list_to_tuple([Name | Fields])
     end;
+merge_terms(undefined, Right) ->
+    Right;
 merge_terms(Left, _Right) ->
     Left.
 
