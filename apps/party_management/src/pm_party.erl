@@ -256,9 +256,9 @@ reduce(
     case is_terms(Terms) of
         true ->
             Name = element(1, Terms),
-            Fields = lists:map(
+            Fields = genlib_range:map(
                 fun(Idx) -> reduce_terms(element(Idx, Terms), VS, Revision) end,
-                lists:seq(2, tuple_size(Terms))
+                {2, tuple_size(Terms)}
             ),
             list_to_tuple([Name | Fields]);
         false ->
@@ -369,10 +369,10 @@ merge_terms(Left, Right) when element(1, Left) == element(1, Right), tuple_size(
         true ->
             Name = element(1, Left),
             Fields =
-                lists:map(
-                    fun(Idx) -> merge_terms(element(Idx, Left), element(Idx, Right)) end,
-                    lists:seq(2, tuple_size(Left))
-                ),
+                genlib_range:map(
+                  fun(Idx) -> merge_terms(element(Idx, Left), element(Idx, Right)) end,
+                  {2, tuple_size(Left)}
+                 ),
             list_to_tuple([Name | Fields])
     end;
 merge_terms(undefined, Right) ->
