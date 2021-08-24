@@ -283,6 +283,7 @@ is_predicate(_) ->
 %% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
 is_terms(Struct) ->
     case Struct of
+        %% Checking by whole struct here for correct tuple-size checking and compile-time errors
         #domain_TermSet{} -> true;
         #domain_PaymentsServiceTerms{} -> true;
         #domain_RecurrentPaytoolsServiceTerms{} -> true;
