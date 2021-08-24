@@ -370,9 +370,9 @@ merge_terms(Left, Right) when element(1, Left) == element(1, Right), tuple_size(
             Name = element(1, Left),
             Fields =
                 genlib_range:map(
-                  fun(Idx) -> merge_terms(element(Idx, Left), element(Idx, Right)) end,
-                  {2, tuple_size(Left)}
-                 ),
+                    fun(Idx) -> merge_terms(element(Idx, Left), element(Idx, Right)) end,
+                    {2, tuple_size(Left)}
+                ),
             list_to_tuple([Name | Fields])
     end;
 merge_terms(undefined, Right) ->
