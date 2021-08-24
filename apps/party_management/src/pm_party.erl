@@ -273,20 +273,11 @@ reduce(
             end
     end.
 
-is_predicate(Struct) ->
-    case Struct of
-        {S, _Data} when
-            S == constant;
-            S == condition;
-            S == is_not;
-            S == all_of;
-            S == any_of;
-            S == criterion
-        ->
-            true;
-        _ ->
-            false
-    end.
+is_predicate({Variant, _Data}) ->
+    {struct, union, VariantsInfo} = dmsl_domain_thrift:struct_info('Predicate'),
+    lists:keyfind(Variant, 4, VariantsInfo) /= false;
+is_predicate(_) ->
+    false.
 
 %% Is it a non-atomic struct
 %% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
