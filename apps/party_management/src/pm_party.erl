@@ -242,76 +242,79 @@ ensure_shop(undefined) ->
     throw(#payproc_ShopNotFound{}).
 
 -spec reduce_terms(dmsl_domain_thrift:'TermSet'(), pm_selector:varset(), revision()) -> dmsl_domain_thrift:'TermSet'().
-reduce_terms(Terms, VS, Revision) ->
-    reduce(Terms, VS, Revision).
+reduce_terms(TermSet, VS, Revision) ->
+    reduce_terms(TermSet, {struct, struct, {dmsl_domain_thrift, 'TermSet'}}, VS, Revision).
 
-reduce(undefined, _VS, _Revision) ->
+reduce_terms(undefined, _Type, _VS, _Revision) ->
     undefined;
-reduce(
-    Terms,
-    VS,
-    Revision
-) when is_tuple(Terms) ->
-    %% If only "if" supported arbitary function call...
-    case is_terms(Terms) of
+reduce_terms(Terms, Type, VS, Revision) ->
+    case is_terms(Type, Terms) of
         true ->
-            Name = element(1, Terms),
-            Fields = genlib_range:map(
-                fun(Idx) -> reduce_terms(element(Idx, Terms), VS, Revision) end,
-                {2, tuple_size(Terms)}
-            ),
-            list_to_tuple([Name | Fields]);
+            reduce_terms_fields(Terms, Type, VS, Revision);
         false ->
-            case is_selector(Terms) of
+            case is_selector(Type) of
                 true ->
                     pm_selector:reduce(Terms, VS, Revision);
                 false ->
-                    case is_predicate(Terms) of
+                    case is_predicate(Type) of
                         true -> pm_selector:reduce_predicate(Terms, VS, Revision);
                         false -> error({unknown_reducee, Terms})
                     end
             end
     end.
 
-is_predicate({Variant, _Data}) ->
-    {struct, union, VariantsInfo} = dmsl_domain_thrift:struct_info('Predicate'),
-    lists:keyfind(Variant, 4, VariantsInfo) /= false;
-is_predicate(_) ->
+%% Explicit Terms check here: since for predicates and selectors it's done in corresponding modules
+is_terms({struct, struct, {dmsl_domain_thrift, Struct}}, Terms) when
+      Struct =:= 'TermSet';
+      Struct =:= 'PaymentsServiceTerms';
+      Struct =:= 'RecurrentPaytoolsServiceTerms';
+      Struct =:= 'PaymentHoldsServiceTerms';
+      Struct =:= 'PaymentRefundsServiceTerms';
+      Struct =:= 'PartialRefundsServiceTerms';
+      Struct =:= 'PaymentChargebackServiceTerms';
+      Struct =:= 'PayoutsServiceTerms';
+      Struct =:= 'ReportsServiceTerms';
+      Struct =:= 'ServiceAcceptanceActsTerms';
+      Struct =:= 'WalletServiceTerms';
+      Struct =:= 'WithdrawalServiceTerms';
+      Struct =:= 'P2PServiceTerms';
+      Struct =:= 'P2PTemplateServiceTerms';
+      Struct =:= 'W2WServiceTerms'
+      ->
+    case is_record(Terms, dmsl_domain_thrift:record_name(Struct)) of
+        true -> true;
+        false ->
+            erlang:display({wtf, Struct, Terms})
+    end;
+    %% is_record(Terms, dmsl_domain_thrift:record_name(Struct));
+is_terms(_, _) ->
     false.
 
-%% Is it a non-atomic struct
-%% (i.e. can be viewed as maps with independent fields and therefore, deep-merged)
-is_terms(Struct) ->
-    case Struct of
-        %% Checking by whole struct here for correct tuple-size checking and compile-time errors
-        #domain_TermSet{} -> true;
-        #domain_PaymentsServiceTerms{} -> true;
-        #domain_RecurrentPaytoolsServiceTerms{} -> true;
-        #domain_PaymentHoldsServiceTerms{} -> true;
-        #domain_PaymentRefundsServiceTerms{} -> true;
-        #domain_PartialRefundsServiceTerms{} -> true;
-        #domain_PaymentChargebackServiceTerms{} -> true;
-        #domain_PayoutsServiceTerms{} -> true;
-        #domain_ReportsServiceTerms{} -> true;
-        #domain_ServiceAcceptanceActsTerms{} -> true;
-        #domain_WalletServiceTerms{} -> true;
-        #domain_WithdrawalServiceTerms{} -> true;
-        #domain_P2PServiceTerms{} -> true;
-        #domain_P2PTemplateServiceTerms{} -> true;
-        #domain_W2WServiceTerms{} -> true;
-        _ -> false
-    end.
+is_predicate({struct, union, {dmsl_domain_thrift, 'Predicate'}}) -> true;
+is_predicate(_FieldType) -> false.
 
-is_selector(Struct) ->
-    case Struct of
-        {S, _Data} when
-            S == decisions;
-            S == value
-        ->
-            true;
-        _ ->
-            false
-    end.
+is_selector({struct, union, {dmsl_domain_thrift, UnionName}}) ->
+    string:find(atom_to_binary(UnionName), <<"Selector">>, trailing) /= nomatch;
+is_selector(_) ->
+    false.
+
+reduce_terms_fields(Terms, Type, VS, Revision) ->
+    StructInfo = get_terms_struct_info(Type),
+    reduce_terms_fields(Terms, 2, StructInfo, VS, Revision).
+
+reduce_terms_fields(Terms, Idx, [{_, optional, Type, _Name, _} | Rest], VS, Revision) ->
+    Term = reduce_terms(element(Idx, Terms), Type, VS, Revision),
+    reduce_terms_fields(setelement(Idx, Terms, Term), Idx + 1, Rest, VS, Revision);
+reduce_terms_fields(Terms, _Idx, [], _, _) ->
+    Terms.
+
+get_terms_struct_info(Type) ->
+    {struct, struct, {Mod, StructName}} = Type,
+    {struct, struct, StructInfo} = Mod:struct_info(StructName),
+    StructInfo.
+
+
+
 
 compute_terms(#domain_Contract{terms = TermsRef, adjustments = Adjustments}, Timestamp, Revision) ->
     ActiveAdjustments = lists:filter(fun(A) -> is_adjustment_active(A, Timestamp) end, Adjustments),
@@ -360,25 +363,33 @@ get_active_term_set(TimedTermSets, Timestamp) ->
     ).
 
 merge_terms(TermSets) when is_list(TermSets) ->
-    lists:foldl(fun merge_terms/2, undefined, TermSets).
+    Type = {struct, struct, {dmsl_domain_thrift, 'TermSet'}},
+    lists:foldl(fun(Left, Right) -> merge_terms(Left, Right, Type) end, undefined, TermSets).
 
-merge_terms(Left, Right) when element(1, Left) == element(1, Right), tuple_size(Left) == tuple_size(Right) ->
-    case is_terms(Left) of
+merge_terms(Left, Right, Type) when element(1, Left) == element(1, Right), tuple_size(Left) == tuple_size(Right) ->
+    case is_terms(Type, Left) of
         false ->
+            %% Replace the value altogether
             Left;
         true ->
-            Name = element(1, Left),
-            Fields =
-                genlib_range:map(
-                    fun(Idx) -> merge_terms(element(Idx, Left), element(Idx, Right)) end,
-                    {2, tuple_size(Left)}
-                ),
-            list_to_tuple([Name | Fields])
+            merge_terms_fields(Left, Right, Type)
     end;
-merge_terms(undefined, Right) ->
+merge_terms(undefined, Right, _Type) ->
     Right;
-merge_terms(Left, _Right) ->
+merge_terms(Left, _Right, _Type) ->
     Left.
+
+merge_terms_fields(Left, Right, Type) ->
+    StructInfo = get_terms_struct_info(Type),
+    Target = setelement(1, erlang:make_tuple(tuple_size(Left), undefined), element(1, Left)),
+    %% Target = Left,
+    merge_terms_fields(Target, Left, Right, 2, StructInfo).
+
+merge_terms_fields(Target, Left, Right, Idx, [{_, optional, Type, _Name, _} | Rest]) ->
+    Term = merge_terms(element(Idx, Left), element(Idx, Right), Type),
+    merge_terms_fields(setelement(Idx, Target, Term), Left, Right, Idx + 1, Rest);
+merge_terms_fields(Target, _Left, _Right, _Idx, []) ->
+    Target.
 
 ensure_account(AccountID, #domain_Party{shops = Shops}) ->
     case find_shop_account(AccountID, maps:to_list(Shops)) of
