@@ -294,7 +294,7 @@ is_predicate({struct, union, {dmsl_domain_thrift, 'Predicate'}}) -> true;
 is_predicate(_FieldType) -> false.
 
 is_selector({struct, union, {dmsl_domain_thrift, UnionName}}) ->
-    string:find(atom_to_binary(UnionName), <<"Selector">>, trailing) /= nomatch;
+    pm_utils:binary_ends_with(atom_to_binary(UnionName), <<"Selector">>);
 is_selector(_) ->
     false.
 

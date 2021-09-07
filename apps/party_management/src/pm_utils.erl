@@ -3,6 +3,7 @@
 -export([unique_id/0]).
 -export([unwrap_result/1]).
 -export([select_defined/2]).
+-export([binary_ends_with/2]).
 
 %%
 
@@ -22,6 +23,12 @@ select_defined([undefined | Vs]) ->
     select_defined(Vs);
 select_defined([]) ->
     undefined.
+
+-spec binary_ends_with(binary(), binary()) -> boolean().
+binary_ends_with(Binary, Suffix) when byte_size(Binary) < byte_size(Suffix) ->
+    false;
+binary_ends_with(Binary, Suffix) when is_binary(Binary), is_binary(Suffix) ->
+    Suffix =:= binary:part(Binary, byte_size(Binary) - byte_size(Suffix), byte_size(Suffix)).
 
 %%
 
