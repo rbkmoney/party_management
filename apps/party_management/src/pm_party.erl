@@ -373,8 +373,7 @@ merge_terms(Left, _Right, _Type) ->
 
 merge_terms_fields(Left, Right, Type) ->
     StructInfo = get_terms_struct_info(Type),
-    Target = erlang:make_tuple(tuple_size(Left), undefined, [{1, element(1, Left)}]),
-    %% Target = Left,
+    Target = setelement(1, erlang:make_tuple(tuple_size(Left), undefined), element(1, Left)),
     merge_terms_fields(Target, Left, Right, 2, StructInfo).
 
 merge_terms_fields(Target, Left, Right, Idx, [{_, optional, Type, _Name, _} | Rest]) ->
