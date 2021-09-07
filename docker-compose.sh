@@ -18,7 +18,7 @@ services:
     mem_limit: 512M
 
   dominant:
-    image: dr2.rbkmoney.com/rbkmoney/dominant:15ceafee13b874a728d28fc5567ad070fac1d0fa
+    image: dr2.rbkmoney.com/rbkmoney/dominant:50446a387373d3023938e87a58b2354a23f4fa0d
     command: /opt/dominant/bin/dominant foreground
     depends_on:
       machinegun:
@@ -37,7 +37,7 @@ services:
       retries: 20
 
   shumway:
-    image: dr2.rbkmoney.com/rbkmoney/shumway:658c9aec229b5a70d745a49cb938bb1a132b5ca2
+    image: dr2.rbkmoney.com/rbkmoney/shumway:44eb989065b27be619acd16b12ebdb2288b46c36
     restart: unless-stopped
     entrypoint:
       - java

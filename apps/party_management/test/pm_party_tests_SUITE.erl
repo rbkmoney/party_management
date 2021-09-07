@@ -107,12 +107,20 @@
 
 -export([compute_pred_w_irreducible_criterion/1]).
 -export([compute_terms_w_criteria/1]).
+-export([check_all_payment_methods/1]).
 
 %% tests descriptions
 
 -type config() :: pm_ct_helper:config().
 -type test_case_name() :: pm_ct_helper:test_case_name().
 -type group_name() :: pm_ct_helper:group_name().
+
+-define(assert_different_term_sets(T1, T2),
+    case T1 =:= T2 of
+        true -> error({equal_term_sets, T1, T2});
+        false -> ok
+    end
+).
 
 cfg(Key, C) ->
     pm_ct_helper:cfg(Key, C).
@@ -266,7 +274,8 @@ groups() ->
         {terms, [sequence], [
             party_creation,
             compute_pred_w_irreducible_criterion,
-            compute_terms_w_criteria
+            compute_terms_w_criteria,
+            check_all_payment_methods
         ]}
     ].
 
@@ -275,12 +284,12 @@ groups() ->
 -spec init_per_suite(config()) -> config().
 init_per_suite(C) ->
     {Apps, _Ret} = pm_ct_helper:start_apps([woody, scoper, dmt_client, party_management]),
-    ok = pm_domain:insert(construct_domain_fixture()),
+    _ = pm_domain:insert(construct_domain_fixture()),
     [{apps, Apps} | C].
 
 -spec end_per_suite(config()) -> _.
 end_per_suite(C) ->
-    ok = pm_domain:cleanup(),
+    _ = pm_domain:cleanup(),
     [application:stop(App) || App <- cfg(apps, C)].
 
 %% tests
@@ -670,7 +679,7 @@ contract_terms_retrieval(C) ->
             payment_methods = {value, [?pmt(bank_card_deprecated, visa)]}
         }
     } = TermSet1,
-    ok = pm_domain:update(construct_term_set_for_party(PartyID, undefined)),
+    _ = pm_domain:update(construct_term_set_for_party(PartyID, undefined)),
     DomainRevision2 = pm_domain:head(),
     Timstamp2 = pm_datetime:format_now(),
     TermSet2 = pm_client_party:compute_contract_terms(
@@ -913,36 +922,57 @@ contract_adjustment_expiration(C) ->
 
 compute_payment_institution_terms(C) ->
     Client = cfg(client, C),
-    #domain_TermSet{} =
-        T1 = pm_client_party:compute_payment_institution_terms(
+    TermsFun = fun(Type, Object) ->
+        #domain_TermSet{} =
+            pm_client_party:compute_payment_institution_terms(
+                ?pinst(2),
+                #payproc_Varset{payment_method = ?pmt(Type, Object)},
+                Client
+            )
+    end,
+    T1 =
+        #domain_TermSet{} =
+        pm_client_party:compute_payment_institution_terms(
             ?pinst(2),
             #payproc_Varset{},
             Client
         ),
-    #domain_TermSet{} =
-        T2 = pm_client_party:compute_payment_institution_terms(
-            ?pinst(2),
-            #payproc_Varset{payment_method = ?pmt(bank_card_deprecated, visa)},
-            Client
-        ),
-    T1 /= T2 orelse error({equal_term_sets, T1, T2}),
-    #domain_TermSet{} =
-        T3 = pm_client_party:compute_payment_institution_terms(
-            ?pinst(2),
-            #payproc_Varset{payment_method = ?pmt(payment_terminal_deprecated, euroset)},
-            Client
-        ),
-    #domain_TermSet{} =
-        T4 = pm_client_party:compute_payment_institution_terms(
-            ?pinst(2),
-            #payproc_Varset{payment_method = ?pmt(empty_cvv_bank_card_deprecated, visa)},
-            Client
-        ),
-    T1 /= T3 orelse error({equal_term_sets, T1, T3}),
-    T2 /= T3 orelse error({equal_term_sets, T2, T3}),
-    T1 /= T4 orelse error({equal_term_sets, T1, T4}),
-    T2 /= T4 orelse error({equal_term_sets, T2, T4}),
-    T3 /= T4 orelse error({equal_term_sets, T3, T4}).
+    T2 = TermsFun(bank_card_deprecated, visa),
+    T3 = TermsFun(payment_terminal_deprecated, euroset),
+    T4 = TermsFun(empty_cvv_bank_card_deprecated, visa),
+
+    ?assert_different_term_sets(T1, T2),
+    ?assert_different_term_sets(T1, T3),
+    ?assert_different_term_sets(T1, T4),
+    ?assert_different_term_sets(T2, T3),
+    ?assert_different_term_sets(T2, T4),
+    ?assert_different_term_sets(T3, T4).
+
+-spec check_all_payment_methods(config()) -> _.
+check_all_payment_methods(C) ->
+    Client = cfg(client, C),
+    TermsFun = fun(Type, Object) ->
+        #domain_TermSet{} =
+            pm_client_party:compute_payment_institution_terms(
+                ?pinst(2),
+                #payproc_Varset{payment_method = ?pmt(Type, Object)},
+                Client
+            ),
+        ok
+    end,
+
+    TermsFun(bank_card, ?bank_card(<<"visa-ref">>)),
+    TermsFun(payment_terminal, ?pmt_srv(<<"alipay-ref">>)),
+    TermsFun(digital_wallet, ?pmt_srv(<<"qiwi-ref">>)),
+    TermsFun(mobile, ?mob(<<"mts-ref">>)),
+    TermsFun(crypto_currency, ?crypta(<<"bitcoin-ref">>)),
+    TermsFun(bank_card_deprecated, maestro),
+    TermsFun(payment_terminal_deprecated, wechat),
+    TermsFun(digital_wallet_deprecated, rbkmoney),
+    TermsFun(tokenized_bank_card_deprecated, ?tkz_bank_card(visa, applepay)),
+    TermsFun(empty_cvv_bank_card_deprecated, visa),
+    TermsFun(crypto_currency_deprecated, litecoin),
+    TermsFun(mobile_deprecated, yota).
 
 compute_payout_cash_flow(C) ->
     Client = cfg(client, C),
@@ -1104,7 +1134,7 @@ shop_terms_retrieval(C) ->
             payment_methods = {value, [?pmt(bank_card_deprecated, visa)]}
         }
     } = TermSet1,
-    ok = pm_domain:update(construct_term_set_for_party(PartyID, {shop_is, ShopID})),
+    _ = pm_domain:update(construct_term_set_for_party(PartyID, {shop_is, ShopID})),
     TermSet2 = pm_client_party:compute_shop_terms(ShopID, pm_datetime:format_now(), {timestamp, Timestamp}, VS, Client),
     #domain_TermSet{
         payments = #domain_PaymentsServiceTerms{
@@ -2090,6 +2120,14 @@ construct_domain_fixture() ->
                     ])}
         }
     },
+
+    PayoutMDFun = fun(PaymentTool, PayoutMethods) ->
+        #domain_PayoutMethodDecision{
+            if_ = {condition, {payment_tool, PaymentTool}},
+            then_ = {value, ordsets:from_list(PayoutMethods)}
+        }
+    end,
+
     TermSet = #domain_TermSet{
         payments = #domain_PaymentsServiceTerms{
             cash_limit =
@@ -2128,6 +2166,85 @@ construct_domain_fixture() ->
                                     }}}},
                         then_ = {value, ordsets:from_list([])}
                     },
+
+                    PayoutMDFun(
+                        {bank_card, #domain_BankCardCondition{definition = {issuer_bank_is, ?bank(1)}}},
+                        [?pomt(russian_bank_account), ?pomt(international_bank_account)]
+                    ),
+                    PayoutMDFun(
+                        {bank_card, #domain_BankCardCondition{definition = {empty_cvv_is, true}}},
+                        []
+                    ),
+
+                    %% For check_all_payment_methods
+                    PayoutMDFun(
+                        {bank_card, #domain_BankCardCondition{
+                            definition = {
+                                payment_system,
+                                #domain_PaymentSystemCondition{
+                                    payment_system_is = ?pmt_sys(<<"visa-ref">>)
+                                }
+                            }
+                        }},
+                        [?pomt(russian_bank_account)]
+                    ),
+                    PayoutMDFun(
+                        {payment_terminal, #domain_PaymentTerminalCondition{
+                            definition = {
+                                payment_service_is,
+                                ?pmt_srv(<<"alipay-ref">>)
+                            }
+                        }},
+                        []
+                    ),
+                    PayoutMDFun(
+                        {digital_wallet, #domain_DigitalWalletCondition{
+                            definition =
+                                {payment_service_is, ?pmt_srv(<<"qiwi-ref">>)}
+                        }},
+                        []
+                    ),
+                    PayoutMDFun(
+                        {mobile_commerce, #domain_MobileCommerceCondition{
+                            definition = {operator_is, ?mob(<<"mts-ref">>)}
+                        }},
+                        []
+                    ),
+                    PayoutMDFun(
+                        {crypto_currency, #domain_CryptoCurrencyCondition{
+                            definition = {crypto_currency_is, ?crypta(<<"bitcoin-ref">>)}
+                        }},
+                        []
+                    ),
+                    PayoutMDFun(
+                        {bank_card, #domain_BankCardCondition{definition = {payment_system_is, maestro}}},
+                        []
+                    ),
+                    PayoutMDFun(
+                        {payment_terminal, #domain_PaymentTerminalCondition{
+                            definition = {provider_is_deprecated, wechat}
+                        }},
+                        []
+                    ),
+                    PayoutMDFun(
+                        {bank_card, #domain_BankCardCondition{
+                            definition =
+                                {payment_system, #domain_PaymentSystemCondition{
+                                    token_provider_is_deprecated = applepay
+                                }}
+                        }},
+                        []
+                    ),
+                    PayoutMDFun(
+                        {crypto_currency, #domain_CryptoCurrencyCondition{
+                            definition = {crypto_currency_is_deprecated, litecoin}
+                        }},
+                        []
+                    ),
+                    PayoutMDFun(
+                        {mobile_commerce, #domain_MobileCommerceCondition{definition = {operator_is_deprecated, yota}}},
+                        []
+                    ),
                     #domain_PayoutMethodDecision{
                         if_ = {condition, {payment_tool, {bank_card, #domain_BankCardCondition{}}}},
                         then_ = {value, ordsets:from_list([?pomt(russian_bank_account)])}
@@ -2424,12 +2541,35 @@ construct_domain_fixture() ->
         pm_ct_fixture:construct_category(?cat(1), <<"Test category">>, test),
         pm_ct_fixture:construct_category(?cat(2), <<"Generic Store">>, live),
         pm_ct_fixture:construct_category(?cat(3), <<"Guns & Booze">>, live),
+        pm_ct_fixture:construct_category(?cat(4), <<"Tech Store">>, live),
+        pm_ct_fixture:construct_category(?cat(5), <<"Burger Boutique">>, live),
+
+        pm_ct_fixture:construct_payment_system(?pmt_sys(<<"visa-ref">>), <<"Visa">>),
+        pm_ct_fixture:construct_payment_service(?pmt_srv(<<"alipay-ref">>), <<"Euroset">>),
+        pm_ct_fixture:construct_payment_service(?pmt_srv(<<"qiwi-ref">>), <<"Qiwi">>),
+        pm_ct_fixture:construct_mobile_operator(?mob(<<"mts-ref">>), <<"MTS">>),
+        pm_ct_fixture:construct_crypto_currency(?crypta(<<"bitcoin-ref">>), <<"Bitcoin">>),
+        pm_ct_fixture:construct_tokenized_service(?token_srv(<<"applepay-ref">>), <<"Apple Pay">>),
+
+        pm_ct_fixture:construct_payment_method(?pmt(bank_card, ?bank_card(<<"visa-ref">>))),
+        pm_ct_fixture:construct_payment_method(?pmt(bank_card, ?bank_card(<<"mastercard-ref">>))),
+        pm_ct_fixture:construct_payment_method(?pmt(bank_card, ?bank_card(<<"jcb-ref">>))),
+        pm_ct_fixture:construct_payment_method(?pmt(bank_card, ?token_bank_card(<<"visa-ref">>, <<"applepay-ref">>))),
+        pm_ct_fixture:construct_payment_method(?pmt(payment_terminal, ?pmt_srv(<<"alipay-ref">>))),
+        pm_ct_fixture:construct_payment_method(?pmt(digital_wallet, ?pmt_srv(<<"qiwi-ref">>))),
+        pm_ct_fixture:construct_payment_method(?pmt(mobile, ?mob(<<"mts-ref">>))),
+        pm_ct_fixture:construct_payment_method(?pmt(crypto_currency, ?crypta(<<"bitcoin-ref">>))),
 
         pm_ct_fixture:construct_payment_method(?pmt(bank_card_deprecated, visa)),
         pm_ct_fixture:construct_payment_method(?pmt(bank_card_deprecated, mastercard)),
         pm_ct_fixture:construct_payment_method(?pmt(bank_card_deprecated, maestro)),
         pm_ct_fixture:construct_payment_method(?pmt(payment_terminal_deprecated, euroset)),
+        pm_ct_fixture:construct_payment_method(?pmt(payment_terminal_deprecated, wechat)),
+        pm_ct_fixture:construct_payment_method(?pmt(digital_wallet_deprecated, rbkmoney)),
+        pm_ct_fixture:construct_payment_method(?pmt(tokenized_bank_card_deprecated, ?tkz_bank_card(visa, applepay))),
         pm_ct_fixture:construct_payment_method(?pmt(empty_cvv_bank_card_deprecated, visa)),
+        pm_ct_fixture:construct_payment_method(?pmt(crypto_currency_deprecated, litecoin)),
+        pm_ct_fixture:construct_payment_method(?pmt(mobile_deprecated, yota)),
 
         pm_ct_fixture:construct_payout_method(?pomt(russian_bank_account)),
         pm_ct_fixture:construct_payout_method(?pomt(international_bank_account)),
