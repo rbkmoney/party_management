@@ -265,28 +265,23 @@ reduce_terms(Terms, Type, VS, Revision) ->
 
 %% Explicit Terms check here: since for predicates and selectors it's done in corresponding modules
 is_terms({struct, struct, {dmsl_domain_thrift, Struct}}, Terms) when
-      Struct =:= 'TermSet';
-      Struct =:= 'PaymentsServiceTerms';
-      Struct =:= 'RecurrentPaytoolsServiceTerms';
-      Struct =:= 'PaymentHoldsServiceTerms';
-      Struct =:= 'PaymentRefundsServiceTerms';
-      Struct =:= 'PartialRefundsServiceTerms';
-      Struct =:= 'PaymentChargebackServiceTerms';
-      Struct =:= 'PayoutsServiceTerms';
-      Struct =:= 'ReportsServiceTerms';
-      Struct =:= 'ServiceAcceptanceActsTerms';
-      Struct =:= 'WalletServiceTerms';
-      Struct =:= 'WithdrawalServiceTerms';
-      Struct =:= 'P2PServiceTerms';
-      Struct =:= 'P2PTemplateServiceTerms';
-      Struct =:= 'W2WServiceTerms'
-      ->
-    case is_record(Terms, dmsl_domain_thrift:record_name(Struct)) of
-        true -> true;
-        false ->
-            erlang:display({wtf, Struct, Terms})
-    end;
-    %% is_record(Terms, dmsl_domain_thrift:record_name(Struct));
+    Struct =:= 'TermSet';
+    Struct =:= 'PaymentsServiceTerms';
+    Struct =:= 'RecurrentPaytoolsServiceTerms';
+    Struct =:= 'PaymentHoldsServiceTerms';
+    Struct =:= 'PaymentRefundsServiceTerms';
+    Struct =:= 'PartialRefundsServiceTerms';
+    Struct =:= 'PaymentChargebackServiceTerms';
+    Struct =:= 'PayoutsServiceTerms';
+    Struct =:= 'ReportsServiceTerms';
+    Struct =:= 'ServiceAcceptanceActsTerms';
+    Struct =:= 'WalletServiceTerms';
+    Struct =:= 'WithdrawalServiceTerms';
+    Struct =:= 'P2PServiceTerms';
+    Struct =:= 'P2PTemplateServiceTerms';
+    Struct =:= 'W2WServiceTerms'
+->
+    is_record(Terms, dmsl_domain_thrift:record_name(Struct));
 is_terms(_, _) ->
     false.
 
@@ -312,9 +307,6 @@ get_terms_struct_info(Type) ->
     {struct, struct, {Mod, StructName}} = Type,
     {struct, struct, StructInfo} = Mod:struct_info(StructName),
     StructInfo.
-
-
-
 
 compute_terms(#domain_Contract{terms = TermsRef, adjustments = Adjustments}, Timestamp, Revision) ->
     ActiveAdjustments = lists:filter(fun(A) -> is_adjustment_active(A, Timestamp) end, Adjustments),
