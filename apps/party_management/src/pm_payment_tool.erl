@@ -234,7 +234,9 @@ test_payment_terminal_condition_def(
     #domain_PaymentTerminal{terminal_type_deprecated = V2},
     _Rev
 ) ->
-    V1 =:= V2.
+    V1 =:= V2;
+test_payment_terminal_condition_def(_Cond, _Data, _Rev) ->
+    false.
 
 test_digital_wallet_condition(#domain_DigitalWalletCondition{definition = Def}, V, Rev) ->
     Def =:= undefined orelse test_digital_wallet_condition_def(Def, V, Rev).
@@ -250,7 +252,9 @@ test_digital_wallet_condition_def(
     #domain_DigitalWallet{provider_deprecated = V2},
     _Rev
 ) ->
-    V1 =:= V2.
+    V1 =:= V2;
+test_digital_wallet_condition_def(_Cond, _Data, _Rev) ->
+    false.
 
 test_crypto_currency_condition(#domain_CryptoCurrencyCondition{definition = Def}, V, Rev) ->
     Def =:= undefined orelse test_crypto_currency_condition_def(Def, V, Rev).
@@ -276,4 +280,6 @@ test_mobile_commerce_condition_def(
     #domain_MobileCommerce{operator_deprecated = C2},
     _Rev
 ) ->
-    C1 =:= C2.
+    C1 =:= C2;
+test_mobile_commerce_condition_def(_Cond, _Data, _Rev) ->
+    false.

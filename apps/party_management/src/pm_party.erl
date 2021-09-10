@@ -272,6 +272,7 @@ is_terms({struct, struct, {dmsl_domain_thrift, Struct}}, Terms) when
     Struct =:= 'PaymentRefundsServiceTerms';
     Struct =:= 'PartialRefundsServiceTerms';
     Struct =:= 'PaymentChargebackServiceTerms';
+    Struct =:= 'PartialCaptureServiceTerms';
     Struct =:= 'PayoutsServiceTerms';
     Struct =:= 'ReportsServiceTerms';
     Struct =:= 'ServiceAcceptanceActsTerms';
