@@ -173,25 +173,33 @@ test_payment_system_condition(
         token_service_is = TpIs,
         payment_system_is_deprecated = PsLegacyIs,
         token_provider_is_deprecated = TpLegacyIs,
-        tokenization_method_is = TmIs
+        tokenization_method_is = TmIs1
     },
     #domain_BankCard{
         payment_system = Ps,
         payment_token = Tp,
         payment_system_deprecated = PsLegacy,
         token_provider_deprecated = TpLegacy,
-        tokenization_method = Tm
+        tokenization_method = Tm1
     },
     _Rev
 ) ->
+    TmIs2 = set_default_tokenization_method(TpLegacyIs, TmIs1),
+    Tm2 = set_default_tokenization_method(TpLegacyIs, Tm1),
     ternary_and([
-        some_defined([PsIs, TpIs, PsLegacyIs, TpLegacyIs, TmIs]),
+        some_defined([PsIs, TpIs, PsLegacyIs, TpLegacyIs, TmIs2]),
         PsIs == undefined orelse PsIs == Ps,
         TpIs == undefined orelse TpIs == Tp,
         PsLegacyIs == undefined orelse PsLegacyIs == PsLegacy,
         TpLegacyIs == undefined orelse TpLegacyIs == TpLegacy,
-        TmIs == undefined orelse ternary_while([Tm, TmIs == Tm])
+        TmIs2 == undefined orelse ternary_while([Tm2, TmIs2 == Tm2])
     ]).
+
+set_default_tokenization_method(TokenProvider, undefined)
+  when TokenProvider /= undefined ->
+    dpan;
+set_default_tokenization_method(_TokenProvider, TokenizationMethod) ->
+    TokenizationMethod.
 
 test_issuer_country_condition(Country, #domain_BankCard{issuer_country = TargetCountry}, _Rev) ->
     ternary_while([TargetCountry, Country == TargetCountry]).
