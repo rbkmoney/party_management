@@ -195,8 +195,9 @@ test_payment_system_condition(
         TmIs2 == undefined orelse ternary_while([Tm2, TmIs2 == Tm2])
     ]).
 
-set_default_tokenization_method(TokenProvider, undefined)
-  when TokenProvider /= undefined ->
+set_default_tokenization_method(TokenProvider, undefined) when
+    TokenProvider /= undefined
+->
     dpan;
 set_default_tokenization_method(_TokenProvider, TokenizationMethod) ->
     TokenizationMethod.
