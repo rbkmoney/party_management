@@ -42,8 +42,7 @@
 
 -callback init(args(), machine()) -> result().
 
--type signal() ::
-    timeout | {repair, args()}.
+-type signal() :: timeout.
 
 -callback process_signal(signal(), machine()) -> result().
 
@@ -53,6 +52,8 @@
 
 -callback process_call(call(), machine()) -> {response(), result()}.
 
+-callback process_repair(args(), machine()) -> result().
+
 -type context() :: #{
     client_context => woody_context:ctx()
 }.
@@ -61,6 +62,7 @@
 -export_type([ref/0]).
 -export_type([tag/0]).
 -export_type([ns/0]).
+-export_type([args/0]).
 -export_type([event_id/0]).
 -export_type([event_payload/0]).
 -export_type([event/0]).
@@ -159,7 +161,8 @@ call(Ns, Ref, Args, After, Limit, Direction) ->
             Error
     end.
 
--spec repair(ns(), ref(), term()) -> {ok, term()} | {error, notfound | failed | working} | no_return().
+-spec repair(ns(), ref(), term()) ->
+    {ok, term()} | {error, notfound | failed | working | {repair, {failed, binary()}}} | no_return().
 repair(Ns, Ref, Args) ->
     Descriptor = prepare_descriptor(Ns, Ref, #mg_stateproc_HistoryRange{}),
     call_automaton('Repair', {Descriptor, wrap_args(Args)}).
@@ -230,12 +233,14 @@ call_automaton(Function, Args) ->
         {exception, #mg_stateproc_MachineFailed{}} ->
             {error, failed};
         {exception, #mg_stateproc_MachineAlreadyWorking{}} ->
-            {error, working}
+            {error, working};
+        {exception, #mg_stateproc_RepairFailed{reason = Reason}} ->
+            {error, {repair, {failed, Reason}}}
     end.
 
 %%
 
--type func() :: 'ProcessSignal' | 'ProcessCall'.
+-type func() :: 'ProcessSignal' | 'ProcessCall' | 'ProcessRepair'.
 
 -spec handle_function(func(), woody:args(), pm_woody_wrapper:handler_opts()) -> term() | no_return().
 handle_function(Func, Args, Opts) ->
@@ -261,7 +266,15 @@ handle_function_('ProcessCall', {Args}, #{ns := Ns} = _Opts) ->
         id => ID,
         activity => call
     }),
-    dispatch_call(Ns, Payload, unmarshal_machine(Machine)).
+    dispatch_call(Ns, Payload, unmarshal_machine(Machine));
+handle_function_('ProcessRepair', {Args}, #{ns := Ns} = _Opts) ->
+    #mg_stateproc_RepairArgs{arg = Payload, machine = #mg_stateproc_Machine{id = ID} = Machine} = Args,
+    scoper:add_meta(#{
+        namespace => Ns,
+        id => ID,
+        activity => repair
+    }),
+    dispatch_repair(Ns, Payload, unmarshal_machine(Machine)).
 
 %%
 
@@ -282,12 +295,6 @@ dispatch_signal(Ns, #mg_stateproc_TimeoutSignal{}, Machine) ->
     _ = log_dispatch(timeout, Machine),
     Module = get_handler_module(Ns),
     Result = Module:process_signal(timeout, Machine),
-    marshal_signal_result(Result, Machine);
-dispatch_signal(Ns, #mg_stateproc_RepairSignal{arg = Payload}, Machine) ->
-    Args = unwrap_args(Payload),
-    _ = log_dispatch(repair, Args, Machine),
-    Module = get_handler_module(Ns),
-    Result = Module:process_signal({repair, Args}, Machine),
     marshal_signal_result(Result, Machine).
 
 marshal_signal_result(Result = #{}, #{aux_state := AuxStWas}) ->
@@ -329,6 +336,39 @@ marshal_call_result(Response, Result, #{aux_state := AuxStWas}) ->
         change = Change,
         action = maps:get(action, Result, pm_machine_action:new()),
         response = marshal_response(Response)
+    }.
+
+-spec dispatch_repair(ns(), Args, machine()) -> Result when
+    Args :: mg_proto_state_processing_thrift:'Args'(),
+    Result :: mg_proto_state_processing_thrift:'RepairResult'().
+dispatch_repair(Ns, Payload, Machine) ->
+    Args = unwrap_args(Payload),
+    _ = log_dispatch(repair, Args, Machine),
+    Module = get_handler_module(Ns),
+    try
+        Result = Module:process_repair(Args, Machine),
+        marshal_repair_result(ok, Result, Machine)
+    catch
+        throw:{exception, Reason} = Error ->
+            logger:info("Process repair failed, ~p", [Reason]),
+            woody_error:raise(business, marshal_repair_failed(Error))
+    end.
+
+marshal_repair_result(Response, RepairResult = #{}, #{aux_state := AuxStWas}) ->
+    _ = logger:debug("repair response = ~p with result = ~p", [Response, RepairResult]),
+    Change = #mg_stateproc_MachineStateChange{
+        events = marshal_events(maps:get(events, RepairResult, [])),
+        aux_state = marshal_aux_st_format(maps:get(auxst, RepairResult, AuxStWas))
+    },
+    #mg_stateproc_RepairResult{
+        change = Change,
+        action = maps:get(action, RepairResult, pm_machine_action:new()),
+        response = marshal_response(Response)
+    }.
+
+marshal_repair_failed({exception, _} = Error) ->
+    #mg_stateproc_RepairFailed{
+        reason = marshal_response(Error)
     }.
 
 %%

@@ -16,6 +16,7 @@
 -export([init/2]).
 -export([process_signal/2]).
 -export([process_call/2]).
+-export([process_repair/2]).
 
 %%
 
@@ -107,8 +108,6 @@ process_init(PartyID, #payproc_PartyParams{contact_info = ContactInfo}) ->
 
 -spec process_signal(pm_machine:signal(), pm_machine:machine()) -> pm_machine:result().
 process_signal(timeout, _Machine) ->
-    #{};
-process_signal({repair, _}, _Machine) ->
     #{}.
 
 -spec process_call(call(), pm_machine:machine()) -> {pm_machine:response(), pm_machine:result()}.
@@ -118,6 +117,10 @@ process_call({{'PartyManagement', Fun}, Args}, Machine) ->
 process_call({{'ClaimCommitter', Fun}, Args}, Machine) ->
     PartyID = erlang:element(1, Args),
     process_call_(PartyID, Fun, Args, Machine).
+
+-spec process_repair(pm_machine:signal(), pm_machine:machine()) -> no_return().
+process_repair(_Args, _Machine) ->
+    #{}.
 
 process_call_(PartyID, Fun, Args, Machine) ->
     #{id := PartyID, history := History, aux_state := WrappedAuxSt} = Machine,
