@@ -51,6 +51,7 @@
 
 -export([shop_not_found_on_retrieval/1]).
 -export([shop_creation/1]).
+-export([shop_aggregation/1]).
 -export([shop_terms_retrieval/1]).
 -export([shop_already_exists/1]).
 -export([shop_update/1]).
@@ -215,6 +216,7 @@ groups() ->
             shop_update_before_confirm,
             shop_update_with_bad_params,
             shop_creation,
+            shop_aggregation,
             shop_terms_retrieval,
             shop_already_exists,
             shop_update,
@@ -462,6 +464,7 @@ end_per_testcase(_Name, _C) ->
 
 -spec shop_not_found_on_retrieval(config()) -> _ | no_return().
 -spec shop_creation(config()) -> _ | no_return().
+-spec shop_aggregation(config()) -> _ | no_return().
 -spec shop_terms_retrieval(config()) -> _ | no_return().
 -spec shop_already_exists(config()) -> _ | no_return().
 -spec shop_update(config()) -> _ | no_return().
@@ -1115,6 +1118,13 @@ shop_creation(C) ->
         details = Details,
         account = #domain_ShopAccount{currency = ?cur(<<"RUB">>)}
     } = pm_client_party:get_shop(ShopID, Client).
+
+shop_aggregation(C) ->
+    Client = cfg(client, C),
+    #payproc_ShopContract{
+        shop = #domain_Shop{id = ?REAL_SHOP_ID},
+        contract = #domain_Contract{id = ?REAL_CONTRACT_ID}
+    } = pm_client_party:get_shop_contract(?REAL_SHOP_ID, Client).
 
 shop_terms_retrieval(C) ->
     Client = cfg(client, C),
