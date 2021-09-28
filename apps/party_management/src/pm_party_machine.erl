@@ -264,9 +264,9 @@ handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
             Reason2 = unicode:characters_to_binary(Reason1),
             InvalidModificationChangeset = [
                 Modification
-                || #claim_management_ModificationUnit{
-                       modification = Modification
-                   } <- Changeset
+             || #claim_management_ModificationUnit{
+                    modification = Modification
+                } <- Changeset
             ],
             erlang:throw(#claim_management_InvalidChangeset{
                 reason = Reason2,

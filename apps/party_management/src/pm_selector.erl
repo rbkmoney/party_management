@@ -75,24 +75,29 @@ reduce_to_value(Selector, VS, Revision) ->
 -spec reduce(t(), varset(), pm_domain:revision()) -> t().
 reduce({value, _} = V, _, _) ->
     V;
-reduce({decisions, Ps}, VS, Rev) ->
-    case reduce_decisions(Ps, VS, Rev) of
-        [{_Type, ?const(true), S} | _] ->
-            S;
+reduce({decisions, Decisions}, VS, Rev) ->
+    case reduce_decisions(Decisions, VS, Rev) of
+        %% Return value only if topmost decision's predicate resolved to true:
+        %% otherwise,
+        %% the decision was either dropped (predicate reduced to false)
+        %% or there's not enough info to reduce a predicate (the result is undefined)
+        [{_Type, ?const(true), Selector} | _] ->
+            Selector;
         Ps1 ->
             {decisions, Ps1}
     end.
 
-reduce_decisions([{Type, V, S} | Rest], VS, Rev) ->
-    case reduce_predicate(V, VS, Rev) of
+%% domain structs in form #domain_SomeDecision { Predicate if_; SomeSelector then_ };
+reduce_decisions([{Type, Predicate, Selector} | Rest], VS, Rev) ->
+    case reduce_predicate(Predicate, VS, Rev) of
         ?const(false) ->
             reduce_decisions(Rest, VS, Rev);
-        V1 ->
-            case reduce(S, VS, Rev) of
+        NewPredicate ->
+            case reduce(Selector, VS, Rev) of
                 {decisions, []} ->
                     reduce_decisions(Rest, VS, Rev);
-                S1 ->
-                    [{Type, V1, S1} | reduce_decisions(Rest, VS, Rev)]
+                NewSelector ->
+                    [{Type, NewPredicate, NewSelector} | reduce_decisions(Rest, VS, Rev)]
             end
     end;
 reduce_decisions([], _, _) ->
@@ -150,12 +155,13 @@ reduce_condition(C, VS, Rev) ->
         B when is_boolean(B) ->
             ?const(B);
         undefined ->
-            % Irreducible, return as is
+            % Irreducible, return as is for further possible reduce
             C
     end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 
 -spec test() -> _.
 
@@ -237,5 +243,29 @@ p2p_allow_test() ->
     VS2 = FunGenVS(visa, visa),
     Allow2 = reduce_predicate(Predicate, VS2, 1),
     ?assertEqual({constant, true}, Allow2).
+
+-spec bin_data_allow_test() -> _.
+bin_data_allow_test() ->
+    VS = pm_varset:decode_varset(#payproc_Varset{
+        bin_data = #domain_BinData{
+            payment_system = <<"payment_system">>,
+            bank_name = <<"bank_name">>
+        }
+    }),
+    CondFun = fun(PS, BN) ->
+        {any_of, [
+            {condition,
+                {bin_data, #domain_BinDataCondition{
+                    payment_system = PS,
+                    bank_name = BN
+                }}}
+        ]}
+    end,
+
+    ?assertEqual(?const(true), reduce_predicate(CondFun({matches, <<"pay">>}, {matches, <<"ban">>}), VS, 1)),
+    ?assertEqual(?const(true), reduce_predicate(CondFun({matches, <<"_system">>}, {matches, <<"_name">>}), VS, 1)),
+    ?assertEqual(?const(false), reduce_predicate(CondFun({equals, <<"system">>}, undefined), VS, 1)),
+    ?assertEqual(?const(false), reduce_predicate(CondFun(undefined, {equals, <<"bank">>}), VS, 1)),
+    ?assertEqual(?const(true), reduce_predicate(CondFun(undefined, undefined), VS, 1)).
 
 -endif.

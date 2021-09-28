@@ -10,6 +10,8 @@
 -define(glob(), #domain_GlobalsRef{}).
 -define(cur(ID), #domain_CurrencyRef{symbolic_code = ID}).
 -define(pmt(C, T), #domain_PaymentMethodRef{id = {C, T}}).
+-define(pmt_sys(ID), #domain_PaymentSystemRef{id = ID}).
+-define(pmt_srv(ID), #domain_PaymentServiceRef{id = ID}).
 -define(pomt(M), #domain_PayoutMethodRef{id = M}).
 -define(cat(ID), #domain_CategoryRef{id = ID}).
 -define(prx(ID), #domain_ProxyRef{id = ID}).
@@ -25,6 +27,16 @@
 -define(bank(ID), #domain_BankRef{id = ID}).
 -define(bussched(ID), #domain_BusinessScheduleRef{id = ID}).
 -define(ruleset(ID), #domain_RoutingRulesetRef{id = ID}).
+-define(mob(ID), #domain_MobileOperatorRef{id = ID}).
+-define(crypta(ID), #domain_CryptoCurrencyRef{id = ID}).
+-define(token_srv(ID), #domain_BankCardTokenServiceRef{id = ID}).
+-define(bank_card(ID), #domain_BankCardPaymentMethod{payment_system = ?pmt_sys(ID)}).
+-define(token_bank_card(ID, Prv), ?token_bank_card(ID, Prv, dpan)).
+-define(token_bank_card(ID, Prv, Method), #domain_BankCardPaymentMethod{
+    payment_system = ?pmt_sys(ID),
+    payment_token = ?token_srv(Prv),
+    tokenization_method = Method
+}).
 -define(p2pprov(ID), #domain_P2PProviderRef{id = ID}).
 -define(wtdrlprov(ID), #domain_WithdrawalProviderRef{id = ID}).
 -define(crit(ID), #domain_CriterionRef{id = ID}).

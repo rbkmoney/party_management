@@ -15,16 +15,49 @@
 -type method() :: dmsl_domain_thrift:'PaymentMethodRef'().
 -type condition() :: dmsl_domain_thrift:'PaymentToolCondition'().
 
+-import(pm_condition, [some_defined/1, ternary_and/1, ternary_while/1]).
+
 -spec create_from_method(method()) -> t().
 %% TODO empty strings - ugly hack for dialyzar
-create_from_method(#domain_PaymentMethodRef{id = {empty_cvv_bank_card_deprecated, PaymentSystem}}) ->
+create_from_method(#domain_PaymentMethodRef{
+    id =
+        {bank_card, #domain_BankCardPaymentMethod{
+            payment_system = PaymentSystem,
+            is_cvv_empty = IsCVVEmpty,
+            payment_token = PaymentToken,
+            tokenization_method = TokenizationMethod,
+            payment_system_deprecated = PaymentSystemLegacy,
+            token_provider_deprecated = TokenProvider
+        }}
+}) ->
     {bank_card, #domain_BankCard{
-        payment_system_deprecated = PaymentSystem,
         token = <<"">>,
+        payment_system = PaymentSystem,
         bin = <<"">>,
         last_digits = <<"">>,
-        is_cvv_empty = true
+        payment_token = PaymentToken,
+        tokenization_method = TokenizationMethod,
+        is_cvv_empty = IsCVVEmpty,
+        payment_system_deprecated = PaymentSystemLegacy,
+        token_provider_deprecated = TokenProvider
     }};
+create_from_method(#domain_PaymentMethodRef{id = {payment_terminal, Ref}}) ->
+    {payment_terminal, #domain_PaymentTerminal{payment_service = Ref}};
+create_from_method(#domain_PaymentMethodRef{id = {digital_wallet, Ref}}) ->
+    {digital_wallet, #domain_DigitalWallet{
+        payment_service = Ref,
+        id = <<"">>
+    }};
+create_from_method(#domain_PaymentMethodRef{id = {mobile, Ref}}) ->
+    {mobile_commerce, #domain_MobileCommerce{
+        operator = Ref,
+        phone = #domain_MobilePhone{
+            cc = <<"">>,
+            ctn = <<"">>
+        }
+    }};
+create_from_method(#domain_PaymentMethodRef{id = {crypto_currency, Ref}}) ->
+    {crypto_currency, Ref};
 create_from_method(#domain_PaymentMethodRef{id = {bank_card_deprecated, PaymentSystem}}) ->
     {bank_card, #domain_BankCard{
         payment_system_deprecated = PaymentSystem,
@@ -32,46 +65,40 @@ create_from_method(#domain_PaymentMethodRef{id = {bank_card_deprecated, PaymentS
         bin = <<"">>,
         last_digits = <<"">>
     }};
-create_from_method(#domain_PaymentMethodRef{
-    id =
-        {tokenized_bank_card_deprecated, #domain_TokenizedBankCard{
-            payment_system_deprecated = PaymentSystem,
-            token_provider_deprecated = TokenProvider,
-            tokenization_method = TokenizationMethod
-        }}
-}) ->
-    {bank_card, #domain_BankCard{
-        payment_system_deprecated = PaymentSystem,
-        token = <<"">>,
-        bin = <<"">>,
-        last_digits = <<"">>,
-        token_provider_deprecated = TokenProvider,
-        tokenization_method = TokenizationMethod
-    }};
-create_from_method(#domain_PaymentMethodRef{
-    id =
-        {bank_card, #domain_BankCardPaymentMethod{
-            payment_system_deprecated = PaymentSystem,
-            is_cvv_empty = IsCVVEmpty,
-            token_provider_deprecated = TokenProvider,
-            tokenization_method = TokenizationMethod
-        }}
-}) ->
-    {bank_card, #domain_BankCard{
-        payment_system_deprecated = PaymentSystem,
-        token = <<"">>,
-        bin = <<"">>,
-        last_digits = <<"">>,
-        token_provider_deprecated = TokenProvider,
-        is_cvv_empty = IsCVVEmpty,
-        tokenization_method = TokenizationMethod
-    }};
 create_from_method(#domain_PaymentMethodRef{id = {payment_terminal_deprecated, TerminalType}}) ->
     {payment_terminal, #domain_PaymentTerminal{terminal_type_deprecated = TerminalType}};
 create_from_method(#domain_PaymentMethodRef{id = {digital_wallet_deprecated, Provider}}) ->
     {digital_wallet, #domain_DigitalWallet{
         provider_deprecated = Provider,
         id = <<"">>
+    }};
+create_from_method(#domain_PaymentMethodRef{
+    id =
+        {tokenized_bank_card_deprecated, #domain_TokenizedBankCard{
+            payment_system = PaymentSystem,
+            payment_token = PaymentToken,
+            tokenization_method = TokenizationMethod,
+            payment_system_deprecated = PaymentSystemLegacy,
+            token_provider_deprecated = TokenProvider
+        }}
+}) ->
+    {bank_card, #domain_BankCard{
+        token = <<"">>,
+        payment_system = PaymentSystem,
+        bin = <<"">>,
+        last_digits = <<"">>,
+        payment_token = PaymentToken,
+        tokenization_method = TokenizationMethod,
+        payment_system_deprecated = PaymentSystemLegacy,
+        token_provider_deprecated = TokenProvider
+    }};
+create_from_method(#domain_PaymentMethodRef{id = {empty_cvv_bank_card_deprecated, PaymentSystem}}) ->
+    {bank_card, #domain_BankCard{
+        payment_system_deprecated = PaymentSystem,
+        token = <<"">>,
+        bin = <<"">>,
+        last_digits = <<"">>,
+        is_cvv_empty = true
     }};
 create_from_method(#domain_PaymentMethodRef{id = {crypto_currency_deprecated, CC}}) ->
     {crypto_currency_deprecated, CC};
@@ -93,8 +120,10 @@ test_condition({payment_terminal, C}, {payment_terminal, V = #domain_PaymentTerm
     test_payment_terminal_condition(C, V, Rev);
 test_condition({digital_wallet, C}, {digital_wallet, V = #domain_DigitalWallet{}}, Rev) ->
     test_digital_wallet_condition(C, V, Rev);
+test_condition({crypto_currency, C}, {crypto_currency, V}, Rev) ->
+    test_crypto_currency_condition(C, {ref, V}, Rev);
 test_condition({crypto_currency, C}, {crypto_currency_deprecated, V}, Rev) ->
-    test_crypto_currency_condition(C, V, Rev);
+    test_crypto_currency_condition(C, {legacy, V}, Rev);
 test_condition({mobile_commerce, C}, {mobile_commerce, V}, Rev) ->
     test_mobile_commerce_condition(C, V, Rev);
 test_condition(_PaymentTool, _Condition, _Rev) ->
@@ -140,28 +169,32 @@ test_bank_card_condition_def({empty_cvv_is, _Val}, #domain_BankCard{}, _Rev) ->
 
 test_payment_system_condition(
     #domain_PaymentSystemCondition{
-        payment_system_is_deprecated = Ps,
-        token_provider_is_deprecated = Tp,
-        tokenization_method_is = TmCond
+        payment_system_is = PsIs,
+        token_service_is = TpIs,
+        payment_system_is_deprecated = PsLegacyIs,
+        token_provider_is_deprecated = TpLegacyIs,
+        tokenization_method_is = TmIs
     },
-    #domain_BankCard{payment_system_deprecated = Ps, token_provider_deprecated = Tp, tokenization_method = Tm},
+    #domain_BankCard{
+        payment_system = Ps,
+        payment_token = Tp,
+        payment_system_deprecated = PsLegacy,
+        token_provider_deprecated = TpLegacy,
+        tokenization_method = Tm
+    },
     _Rev
 ) ->
-    test_tokenization_method_condition(TmCond, Tm);
-test_payment_system_condition(#domain_PaymentSystemCondition{}, #domain_BankCard{}, _Rev) ->
-    false.
+    ternary_and([
+        some_defined([PsIs, TpIs, PsLegacyIs, TpLegacyIs, TmIs]),
+        PsIs == undefined orelse PsIs == Ps,
+        TpIs == undefined orelse TpIs == Tp,
+        PsLegacyIs == undefined orelse PsLegacyIs == PsLegacy,
+        TpLegacyIs == undefined orelse TpLegacyIs == TpLegacy,
+        TmIs == undefined orelse ternary_while([Tm, TmIs == Tm])
+    ]).
 
-test_tokenization_method_condition(undefined, _) ->
-    true;
-test_tokenization_method_condition(_NotUndefined, undefined) ->
-    undefined;
-test_tokenization_method_condition(DesiredMethod, ActualMethod) ->
-    DesiredMethod == ActualMethod.
-
-test_issuer_country_condition(_Country, #domain_BankCard{issuer_country = undefined}, _Rev) ->
-    undefined;
 test_issuer_country_condition(Country, #domain_BankCard{issuer_country = TargetCountry}, _Rev) ->
-    Country == TargetCountry.
+    ternary_while([TargetCountry, Country == TargetCountry]).
 
 test_issuer_bank_condition(BankRef, #domain_BankCard{bank_name = BankName, bin = BIN}, Rev) ->
     #domain_Bank{binbase_id_patterns = Patterns, bins = BINs} = pm_domain:get(Rev, {bank, BankRef}),
@@ -191,34 +224,62 @@ test_payment_terminal_condition(#domain_PaymentTerminalCondition{definition = De
     Def =:= undefined orelse test_payment_terminal_condition_def(Def, V, Rev).
 
 test_payment_terminal_condition_def(
+    {payment_service_is, Ps1},
+    #domain_PaymentTerminal{payment_service = Ps2},
+    _Rev
+) ->
+    Ps1 =:= Ps2;
+test_payment_terminal_condition_def(
     {provider_is_deprecated, V1},
     #domain_PaymentTerminal{terminal_type_deprecated = V2},
     _Rev
 ) ->
-    V1 =:= V2.
+    V1 =:= V2;
+test_payment_terminal_condition_def(_Cond, _Data, _Rev) ->
+    false.
 
 test_digital_wallet_condition(#domain_DigitalWalletCondition{definition = Def}, V, Rev) ->
     Def =:= undefined orelse test_digital_wallet_condition_def(Def, V, Rev).
 
 test_digital_wallet_condition_def(
+    {payment_service_is, Ps1},
+    #domain_DigitalWallet{payment_service = Ps2},
+    _Rev
+) ->
+    Ps1 =:= Ps2;
+test_digital_wallet_condition_def(
     {provider_is_deprecated, V1},
     #domain_DigitalWallet{provider_deprecated = V2},
     _Rev
 ) ->
-    V1 =:= V2.
+    V1 =:= V2;
+test_digital_wallet_condition_def(_Cond, _Data, _Rev) ->
+    false.
 
 test_crypto_currency_condition(#domain_CryptoCurrencyCondition{definition = Def}, V, Rev) ->
     Def =:= undefined orelse test_crypto_currency_condition_def(Def, V, Rev).
 
-test_crypto_currency_condition_def({crypto_currency_is_deprecated, C1}, C2, _Rev) ->
-    C1 =:= C2.
+test_crypto_currency_condition_def({crypto_currency_is, C1}, {ref, C2}, _Rev) ->
+    C1 =:= C2;
+test_crypto_currency_condition_def({crypto_currency_is_deprecated, C1}, {legacy, C2}, _Rev) ->
+    C1 =:= C2;
+test_crypto_currency_condition_def(_Cond, _Data, _Rev) ->
+    false.
 
 test_mobile_commerce_condition(#domain_MobileCommerceCondition{definition = Def}, V, Rev) ->
     Def =:= undefined orelse test_mobile_commerce_condition_def(Def, V, Rev).
 
 test_mobile_commerce_condition_def(
+    {operator_is, C1},
+    #domain_MobileCommerce{operator = C2},
+    _Rev
+) ->
+    C1 =:= C2;
+test_mobile_commerce_condition_def(
     {operator_is_deprecated, C1},
     #domain_MobileCommerce{operator_deprecated = C2},
     _Rev
 ) ->
-    C1 =:= C2.
+    C1 =:= C2;
+test_mobile_commerce_condition_def(_Cond, _Data, _Rev) ->
+    false.

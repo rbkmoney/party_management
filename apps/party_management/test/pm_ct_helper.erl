@@ -44,15 +44,22 @@
 
 -spec start_app(app_name()) -> {[app_name()], map()}.
 start_app(scoper = AppName) ->
-    {start_app(AppName, [
+    {
+        start_app(AppName, [
             {storage, scoper_storage_logger}
-        ]), #{}};
+        ]),
+        #{}
+    };
 start_app(woody = AppName) ->
-    {start_app(AppName, [
+    {
+        start_app(AppName, [
             {acceptors_pool_size, 4}
-        ]), #{}};
+        ]),
+        #{}
+    };
 start_app(dmt_client = AppName) ->
-    {start_app(AppName, [
+    {
+        start_app(AppName, [
             % milliseconds
             {cache_update_interval, 5000},
             {max_cache_size, #{
@@ -73,9 +80,12 @@ start_app(dmt_client = AppName) ->
                 'Repository' => <<"http://dominant:8022/v1/domain/repository">>,
                 'RepositoryClient' => <<"http://dominant:8022/v1/domain/repository_client">>
             }}
-        ]), #{}};
+        ]),
+        #{}
+    };
 start_app(party_management = AppName) ->
-    {start_app(AppName, [
+    {
+        start_app(AppName, [
             {scoper_event_handler_options, #{
                 event_handler_opts => #{
                     formatter_opts => #{
@@ -101,7 +111,9 @@ start_app(party_management = AppName) ->
                     }
                 }
             }}
-        ]), #{}};
+        ]),
+        #{}
+    };
 start_app(AppName) ->
     {genlib_app:start_application(AppName), #{}}.
 
