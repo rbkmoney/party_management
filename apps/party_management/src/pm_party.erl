@@ -281,7 +281,7 @@ is_terms({struct, struct, {dmsl_domain_thrift, Struct}}, Terms) when
     Struct =:= 'P2PServiceTerms';
     Struct =:= 'P2PTemplateServiceTerms';
     Struct =:= 'W2WServiceTerms';
-    Struct =:= 'PaymentAllocationServiceTerms'                                                              
+    Struct =:= 'PaymentAllocationServiceTerms'
 ->
     is_record(Terms, dmsl_domain_thrift:record_name(Struct));
 is_terms(_, _) ->
