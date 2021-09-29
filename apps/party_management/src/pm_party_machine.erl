@@ -268,7 +268,7 @@ handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
             ],
             ReasonLegacy = unicode:characters_to_binary(io_lib:format("~0tp", [Reason0])),
             % TODO ED-274:  временная функция для возможности работы со старой системой исключений
-            % !!! при конвертации ShopPayoutToolInvalid -> InvalidShopPayoutTool происходит потеря данных
+            % !!! для конвертации ShopPayoutToolInvalid -> InvalidShopPayoutTool недостаточно данных
             Reason = map_invalid_changeset_reason(Reason0),
             erlang:throw(#claim_management_InvalidChangeset{
                 reason = {invalid_party_changeset, Reason},
@@ -532,7 +532,7 @@ map_invalid_shop_reason({invalid_status, InvalidStatus}) ->
 map_invalid_shop_reason({contract_terms_violated, ContractTermsViolated}) ->
     {contract_terms_violated, map_contract_terms_violated(ContractTermsViolated)};
 map_invalid_shop_reason({payout_tool_invalid, _InvalidShopPayoutTool}) ->
-    % TODO ED-274: при конвертации ShopPayoutToolInvalid -> InvalidShopPayoutTool потеря данных
+    % TODO ED-274: для конвертации ShopPayoutToolInvalid -> InvalidShopPayoutTool недостаточно данных
     undefined;
 map_invalid_shop_reason({invalid_object_reference, InvalidObjectReference}) ->
     {invalid_object_reference, map_invalid_object_reference(InvalidObjectReference)}.
