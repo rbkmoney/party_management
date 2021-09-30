@@ -7,7 +7,7 @@
 -include("party_events.hrl").
 
 -export([from_claim_mgmt/1]).
--export([assert_cash_regisrter_modifications_applicable/2]).
+-export([assert_cash_register_modifications_applicable/2]).
 
 -type party() :: pm_party:party().
 -type changeset() :: dmsl_claim_management_thrift:'ClaimChangeset'().
@@ -34,8 +34,8 @@ from_claim_mgmt(#claim_management_Claim{
             }
     end.
 
--spec assert_cash_regisrter_modifications_applicable(changeset(), party()) -> ok | no_return().
-assert_cash_regisrter_modifications_applicable(Changeset, Party) ->
+-spec assert_cash_register_modifications_applicable(changeset(), party()) -> ok | no_return().
+assert_cash_register_modifications_applicable(Changeset, Party) ->
     CashRegisterShopIDs = get_cash_register_modifications_shop_ids(Changeset),
     ShopIDs = get_all_valid_shop_ids(Changeset, Party),
     case sets:is_subset(CashRegisterShopIDs, ShopIDs) of

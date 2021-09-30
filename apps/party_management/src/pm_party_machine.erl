@@ -244,7 +244,7 @@ handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
     } = Claim,
     try
         Party = get_st_party(St),
-        ok = pm_claim_committer:assert_cash_regisrter_modifications_applicable(Changeset, Party),
+        ok = pm_claim_committer:assert_cash_register_modifications_applicable(Changeset, Party),
         case pm_claim_committer:from_claim_mgmt(Claim) of
             undefined ->
                 ok;
