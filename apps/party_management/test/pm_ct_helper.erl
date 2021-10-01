@@ -9,13 +9,13 @@
 -export([create_client/1]).
 -export([create_client/2]).
 
--export([create_party_and_shop/5]).
--export([create_battle_ready_shop/5]).
--export([create_contract/3]).
+-export([create_claim/2]).
+-export([accept_claim/2]).
+-export([commit_claim/2]).
+
 -export([get_first_contract_id/1]).
 -export([get_first_battle_ready_contract_id/1]).
 -export([get_first_payout_tool_id/2]).
--export([adjust_contract/3]).
 
 -export([make_battle_ready_contract_params/2]).
 -export([make_battle_ready_contractor/0]).
@@ -27,6 +27,8 @@
 -export([make_meta_ns/0]).
 -export([make_meta_data/0]).
 -export([make_meta_data/1]).
+
+-include("claim_management.hrl").
 
 -include("pm_ct_domain.hrl").
 -include("pm_ct_json.hrl").
@@ -176,89 +178,17 @@ make_user_identity(UserID) ->
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 -include_lib("party_management/include/party_events.hrl").
 
+-type party_id() :: dmsl_domain_thrift:'PartyID'().
 -type contract_id() :: dmsl_domain_thrift:'ContractID'().
--type contract_tpl() :: dmsl_domain_thrift:'ContractTemplateRef'().
--type shop_id() :: dmsl_domain_thrift:'ShopID'().
--type category() :: dmsl_domain_thrift:'CategoryRef'().
--type currency() :: dmsl_domain_thrift:'CurrencySymbolicCode'().
--type payment_institution() :: dmsl_domain_thrift:'PaymentInstitutionRef'().
-
--spec create_party_and_shop(
-    category(),
-    currency(),
-    contract_tpl(),
-    dmsl_domain_thrift:'PaymentInstitutionRef'(),
-    Client :: pid()
-) -> shop_id().
-create_party_and_shop(Category, Currency, TemplateRef, PaymentInstitutionRef, Client) ->
-    _ = pm_client_party:create(make_party_params(), Client),
-    #domain_Party{} = pm_client_party:get(Client),
-    create_battle_ready_shop(Category, Currency, TemplateRef, PaymentInstitutionRef, Client).
-
-make_party_params() ->
-    #payproc_PartyParams{
-        contact_info = #domain_PartyContactInfo{
-            email = <<?MODULE_STRING>>
-        }
-    }.
-
--spec create_battle_ready_shop(category(), currency(), contract_tpl(), payment_institution(), Client :: pid()) ->
-    shop_id().
-create_battle_ready_shop(Category, Currency, TemplateRef, PaymentInstitutionRef, Client) ->
-    ContractID = pm_utils:unique_id(),
-    ContractParams = make_battle_ready_contract_params(TemplateRef, PaymentInstitutionRef),
-    PayoutToolID = pm_utils:unique_id(),
-    PayoutToolParams = make_battle_ready_payout_tool_params(),
-    ShopID = pm_utils:unique_id(),
-    ShopParams = #payproc_ShopParams{
-        category = Category,
-        location = {url, <<>>},
-        details = make_shop_details(<<"Battle Ready Shop">>),
-        contract_id = ContractID,
-        payout_tool_id = PayoutToolID
-    },
-    ShopAccountParams = #payproc_ShopAccountParams{currency = ?cur(Currency)},
-    Changeset = [
-        {contract_modification, #payproc_ContractModificationUnit{
-            id = ContractID,
-            modification = {creation, ContractParams}
-        }},
-        {contract_modification, #payproc_ContractModificationUnit{
-            id = ContractID,
-            modification =
-                {payout_tool_modification, #payproc_PayoutToolModificationUnit{
-                    payout_tool_id = PayoutToolID,
-                    modification = {creation, PayoutToolParams}
-                }}
-        }},
-        ?shop_modification(ShopID, {creation, ShopParams}),
-        ?shop_modification(ShopID, {shop_account_creation, ShopAccountParams})
-    ],
-    ok = ensure_claim_accepted(pm_client_party:create_claim(Changeset, Client), Client),
-    _Shop = pm_client_party:get_shop(ShopID, Client),
-    ShopID.
-
--spec create_contract(contract_tpl(), payment_institution(), Client :: pid()) -> contract_id().
-create_contract(TemplateRef, PaymentInstitutionRef, Client) ->
-    ContractID = pm_utils:unique_id(),
-    ContractParams = make_battle_ready_contract_params(TemplateRef, PaymentInstitutionRef),
-    Changeset = [
-        {contract_modification, #payproc_ContractModificationUnit{
-            id = ContractID,
-            modification = {creation, ContractParams}
-        }}
-    ],
-    ok = ensure_claim_accepted(pm_client_party:create_claim(Changeset, Client), Client),
-    ContractID.
 
 -spec get_first_contract_id(Client :: pid()) -> contract_id().
 get_first_contract_id(Client) ->
-    #domain_Party{contracts = Contracts} = pm_client_party:get(Client),
+    #domain_Party{contracts = Contracts} = pm_client:get_party(Client),
     lists:min(maps:keys(Contracts)).
 
 -spec get_first_battle_ready_contract_id(Client :: pid()) -> contract_id().
 get_first_battle_ready_contract_id(Client) ->
-    #domain_Party{contracts = Contracts} = pm_client_party:get(Client),
+    #domain_Party{contracts = Contracts} = pm_client:get_party(Client),
     IDs = lists:foldl(
         fun({ID, Contract}, Acc) ->
             case Contract of
@@ -281,39 +211,9 @@ get_first_battle_ready_contract_id(Client) ->
             error(not_found)
     end.
 
--spec adjust_contract(contract_id(), contract_tpl(), Client :: pid()) -> ok.
-adjust_contract(ContractID, TemplateRef, Client) ->
-    ensure_claim_accepted(
-        pm_client_party:create_claim(
-            [
-                {contract_modification, #payproc_ContractModificationUnit{
-                    id = ContractID,
-                    modification =
-                        {adjustment_modification, #payproc_ContractAdjustmentModificationUnit{
-                            adjustment_id = pm_utils:unique_id(),
-                            modification =
-                                {creation, #payproc_ContractAdjustmentParams{
-                                    template = TemplateRef
-                                }}
-                        }}
-                }}
-            ],
-            Client
-        ),
-        Client
-    ).
-
-ensure_claim_accepted(#payproc_Claim{id = ClaimID, revision = ClaimRevision, status = Status}, Client) ->
-    case Status of
-        {accepted, _} ->
-            ok;
-        _ ->
-            ok = pm_client_party:accept_claim(ClaimID, ClaimRevision, Client)
-    end.
-
 -spec get_first_payout_tool_id(contract_id(), Client :: pid()) -> dmsl_domain_thrift:'PayoutToolID'().
 get_first_payout_tool_id(ContractID, Client) ->
-    #domain_Contract{payout_tools = PayoutTools} = pm_client_party:get_contract(ContractID, Client),
+    #domain_Contract{payout_tools = PayoutTools} = pm_client:get_contract(ContractID, Client),
     case PayoutTools of
         [Tool | _] ->
             Tool#domain_PayoutTool.id;
@@ -392,3 +292,44 @@ make_meta_data(NS) ->
         {i, 42} => {str, <<"42">>},
         {str, <<"STRING!">>} => {arr, []}
     }}.
+
+-type cm_claim() :: dmsl_claim_management_thrift:'Claim'().
+-type cm_claim_modification() :: dmsl_claim_management_thrift:'PartyModification'().
+
+-spec create_claim([cm_claim_modification()], party_id()) -> cm_claim().
+create_claim(Modifications, PartyID) ->
+    UserInfo = #claim_management_UserInfo{
+        id = <<"test">>,
+        email = <<"test@localhost">>,
+        username = <<"test">>,
+        type = {internal_user, #claim_management_InternalUser{}}
+    },
+    #claim_management_Claim{
+        id = id(),
+        party_id = PartyID,
+        status = {pending, #claim_management_ClaimPending{}},
+        changeset = [?cm_party_modification(id(), ts(), Mod, UserInfo) || Mod <- Modifications],
+        revision = 1,
+        created_at = ts()
+    }.
+
+-spec accept_claim(cm_claim(), Client :: pid()) -> ok | woody_error:business_error().
+accept_claim(Claim, Client) ->
+    Result = pm_client:accept_claim(Claim, Client),
+    map_call_result(Result).
+
+-spec commit_claim(cm_claim(), Client :: pid()) -> ok | woody_error:business_error().
+commit_claim(Claim, Client) ->
+    Result = pm_client:commit_claim(Claim, Client),
+    map_call_result(Result).
+
+id() ->
+    erlang:unique_integer([positive, monotonic]).
+
+ts() ->
+    pm_datetime:format_now().
+
+map_call_result({ok, ok}) ->
+    ok;
+map_call_result(Other) ->
+    Other.

@@ -13,10 +13,13 @@
 -export([contractor_one_creation/1]).
 -export([contractor_two_creation/1]).
 -export([contractor_modification/1]).
+-export([contract_expiration/1]).
 -export([contract_one_creation/1]).
 -export([contract_two_creation/1]).
+-export([party_changes_revisions/1]).
 -export([contract_contractor_modification/1]).
 -export([contract_adjustment_creation/1]).
+-export([contract_adjustment_expiration/1]).
 -export([contract_legal_agreement_binding/1]).
 -export([contract_report_preferences_modification/1]).
 -export([shop_creation/1]).
@@ -49,9 +52,12 @@ all() ->
         contractor_one_creation,
         contractor_two_creation,
         contractor_modification,
+        contract_expiration,
         contract_one_creation,
         contract_two_creation,
+        party_changes_revisions,
         contract_contractor_modification,
+        contract_adjustment_expiration,
         contract_adjustment_creation,
         contract_legal_agreement_binding,
         contract_report_preferences_modification,
@@ -71,8 +77,9 @@ init_per_suite(C) ->
     {Apps, _Ret} = pm_ct_helper:start_apps([woody, scoper, dmt_client, party_management]),
     _ = pm_domain:insert(construct_domain_fixture()),
     PartyID = erlang:list_to_binary([?MODULE_STRING, ".", erlang:integer_to_list(erlang:system_time())]),
-    ApiClient = pm_ct_helper:create_client(PartyID),
-    [{apps, Apps}, {party_id, PartyID}, {api_client, ApiClient} | C].
+    Context = pm_ct_helper:create_client(PartyID),
+    Client = pm_client:start(PartyID, Context),
+    [{apps, Apps}, {party_id, PartyID}, {client, Client} | C].
 
 -spec end_per_suite(config()) -> _.
 end_per_suite(C) ->
@@ -84,9 +91,10 @@ end_per_suite(C) ->
 -spec party_creation(config()) -> _.
 party_creation(C) ->
     PartyID = cfg(party_id, C),
+    Client = cfg(client, C),
     ContactInfo = #domain_PartyContactInfo{email = <<?MODULE_STRING>>},
-    ok = create_party(PartyID, ContactInfo, C),
-    {ok, Party} = get_party(PartyID, C),
+    ok = create_party(ContactInfo, Client),
+    Party = get_party(Client),
     #domain_Party{
         id = PartyID,
         contact_info = ContactInfo,
@@ -100,6 +108,7 @@ party_creation(C) ->
 
 -spec contractor_one_creation(config()) -> _.
 contractor_one_creation(C) ->
+    Client = cfg(client, C),
     ContractorParams = pm_ct_helper:make_battle_ready_contractor(),
     ContractorID = ?REAL_CONTRACTOR_ID1,
     Modifications = [
@@ -107,13 +116,14 @@ contractor_one_creation(C) ->
     ],
     PartyID = cfg(party_id, C),
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, Party} = get_party(PartyID, C),
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    Party = get_party(Client),
     #domain_PartyContractor{} = pm_party:get_contractor(ContractorID, Party).
 
 -spec contractor_two_creation(config()) -> _.
 contractor_two_creation(C) ->
+    Client = cfg(client, C),
     ContractorParams = pm_ct_helper:make_battle_ready_contractor(),
     ContractorID = ?REAL_CONTRACTOR_ID2,
     Modifications = [
@@ -121,29 +131,54 @@ contractor_two_creation(C) ->
     ],
     PartyID = cfg(party_id, C),
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, Party} = get_party(PartyID, C),
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    Party = get_party(Client),
     #domain_PartyContractor{} = pm_party:get_contractor(ContractorID, Party).
 
 -spec contractor_modification(config()) -> _.
 contractor_modification(C) ->
+    Client = cfg(client, C),
     ContractorID = ?REAL_CONTRACTOR_ID1,
     PartyID = cfg(party_id, C),
-    {ok, Party1} = get_party(PartyID, C),
+    Party1 = get_party(Client),
     #domain_PartyContractor{} = C1 = pm_party:get_contractor(ContractorID, Party1),
     Modifications = [
         ?cm_contractor_identification_level_modification(ContractorID, full)
     ],
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, Party2} = get_party(PartyID, C),
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    Party2 = get_party(Client),
     #domain_PartyContractor{} = C2 = pm_party:get_contractor(ContractorID, Party2),
     C1 /= C2 orelse error(same_contractor).
 
+-spec contract_expiration(config()) -> _.
+contract_expiration(C) ->
+    Client = cfg(client, C),
+    ContractorParams = pm_ct_helper:make_battle_ready_contractor(),
+    ContractorID = <<"CONTRACT_EXPIRED_CONTRACTOR">>,
+    PartyID = cfg(party_id, C),
+    ContractID = <<"CONTRACT_EXPIRED">>,
+    ContractParams = make_contract_params(ContractorID, ?tmpl(3)),
+    PayoutToolID = <<"CONTRACT_EXPIRED_PAYOUT_TOOL">>,
+    PayoutToolParams = make_payout_tool_params(),
+    Modifications = [
+        ?cm_contractor_creation(ContractorID, ContractorParams),
+        ?cm_contract_creation(ContractID, ContractParams),
+        ?cm_contract_modification(ContractID, ?cm_payout_tool_creation(PayoutToolID, PayoutToolParams))
+    ],
+    Claim = claim(Modifications, PartyID),
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
+        id = ContractID,
+        status = {expired, _}
+    } = get_contract(ContractID, Client).
+
 -spec contract_one_creation(config()) -> _.
 contract_one_creation(C) ->
+    Client = cfg(client, C),
     ContractParams = make_contract_params(?REAL_CONTRACTOR_ID1),
     PayoutToolParams = make_payout_tool_params(),
     ContractID = ?REAL_CONTRACT_ID1,
@@ -156,17 +191,18 @@ contract_one_creation(C) ->
     ],
     PartyID = cfg(party_id, C),
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Contract{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
         id = ContractID,
         payout_tools = PayoutTools
-    }} = get_contract(PartyID, ContractID, C),
+    } = get_contract(ContractID, Client),
     true = lists:keymember(PayoutToolID1, #domain_PayoutTool.id, PayoutTools),
     true = lists:keymember(PayoutToolID2, #domain_PayoutTool.id, PayoutTools).
 
 -spec contract_two_creation(config()) -> _.
 contract_two_creation(C) ->
+    Client = cfg(client, C),
     ContractParams = make_contract_params(?REAL_CONTRACTOR_ID1),
     PayoutToolParams = make_payout_tool_params(),
     ContractID = ?REAL_CONTRACT_ID2,
@@ -177,16 +213,65 @@ contract_two_creation(C) ->
     ],
     PartyID = cfg(party_id, C),
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Contract{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
         id = ContractID,
         payout_tools = PayoutTools
-    }} = get_contract(PartyID, ContractID, C),
+    } = get_contract(ContractID, Client),
     true = lists:keymember(PayoutToolID1, #domain_PayoutTool.id, PayoutTools).
+
+-spec party_changes_revisions(config()) -> _.
+party_changes_revisions(C) ->
+    Client = cfg(client, C),
+    PartyID = cfg(party_id, C),
+    Party1 = get_party(Client),
+    R1 = Party1#domain_Party.revision,
+    R1 = get_party_revision(Client),
+    Party1 = checkout_party_revision({revision, R1}, Client),
+    #domain_Party{revision = R1} = Party1,
+    Modifications = create_change_set(0),
+    Claim = claim(Modifications, PartyID),
+    R1 = get_party_revision(Client),
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    R2 = get_party_revision(Client),
+    R2 = R1 + 1,
+    Party2 = checkout_party_revision({revision, R2}, Client),
+    #domain_Party{revision = R2} = Party2,
+    % some more
+    Max = 7,
+    Claims = [
+        claim(create_change_set(Num), Party2#domain_Party.id)
+     || Num <- lists:seq(1, Max)
+    ],
+    R2 = get_party_revision(Client),
+    Party2 = checkout_party_revision({revision, R2}, Client),
+    _Oks = [
+        begin
+            ok = accept_claim(Cl, Client),
+            ok = commit_claim(Cl, Client)
+        end
+     || Cl <- Claims
+    ],
+    R3 = get_party_revision(Client),
+    R3 = R2 + Max,
+    #domain_Party{revision = R3} = checkout_party_revision({revision, R3}, Client).
+
+create_change_set(ID) ->
+    ContractParams = make_contract_params(?REAL_CONTRACTOR_ID1),
+    PayoutToolParams = make_payout_tool_params(),
+    BinaryID = erlang:integer_to_binary(ID),
+    ContractID = <<?REAL_CONTRACT_ID1/binary, BinaryID/binary>>,
+    PayoutToolID = <<"1">>,
+    [
+        ?cm_contract_creation(ContractID, ContractParams),
+        ?cm_contract_modification(ContractID, ?cm_payout_tool_creation(PayoutToolID, PayoutToolParams))
+    ].
 
 -spec contract_contractor_modification(config()) -> _.
 contract_contractor_modification(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID2,
     NewContractor = ?REAL_CONTRACTOR_ID2,
@@ -194,31 +279,70 @@ contract_contractor_modification(C) ->
         ?cm_contract_modification(ContractID, {contractor_modification, NewContractor})
     ],
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Contract{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
         id = ContractID,
         contractor_id = NewContractor
-    }} = get_contract(PartyID, ContractID, C).
+    } = get_contract(ContractID, Client).
+
+-spec contract_adjustment_expiration(config()) -> _.
+contract_adjustment_expiration(C) ->
+    Client = cfg(client, C),
+    PartyID = cfg(party_id, C),
+    ok = pm_context:save(pm_context:create()),
+    ContractID = ?REAL_CONTRACT_ID1,
+    ID = <<"ADJ2">>,
+    Revision = pm_domain:head(),
+    Contract = get_contract(ContractID, Client),
+    Terms = pm_party:get_terms(
+        Contract,
+        pm_datetime:format_now(),
+        Revision
+    ),
+    AdjustmentTemplate = #domain_ContractTemplateRef{id = 4},
+    Modifications = [?cm_contract_modification(ContractID, ?cm_adjustment_creation(ID, AdjustmentTemplate))],
+    Claim = claim(Modifications, PartyID),
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
+        id = ContractID,
+        adjustments = Adjustments
+    } = get_contract(ContractID, Client),
+    true = lists:keymember(ID, #domain_ContractAdjustment.id, Adjustments),
+    Contract2 = get_contract(ContractID, Client),
+    true =
+        Terms /=
+            pm_party:get_terms(
+                Contract2,
+                pm_datetime:format_now(),
+                Revision
+            ),
+    AfterExpiration = pm_datetime:add_interval(pm_datetime:format_now(), {0, 1, 1}),
+    Contract2 = get_contract(ContractID, Client),
+    Terms = pm_party:get_terms(Contract2, AfterExpiration, Revision),
+    pm_context:cleanup().
 
 -spec contract_adjustment_creation(config()) -> _.
 contract_adjustment_creation(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID1,
     ID = <<"ADJ1">>,
     AdjustmentTemplate = #domain_ContractTemplateRef{id = 2},
     Modifications = [?cm_contract_modification(ContractID, ?cm_adjustment_creation(ID, AdjustmentTemplate))],
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Contract{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
         id = ContractID,
         adjustments = Adjustments
-    }} = get_contract(PartyID, ContractID, C),
+    } = get_contract(ContractID, Client),
     true = lists:keymember(ID, #domain_ContractAdjustment.id, Adjustments).
 
 -spec contract_legal_agreement_binding(config()) -> _.
 contract_legal_agreement_binding(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID1,
     LA = #domain_LegalAgreement{
@@ -227,15 +351,16 @@ contract_legal_agreement_binding(C) ->
     },
     Changeset = [?cm_contract_modification(ContractID, {legal_agreement_binding, LA})],
     Claim = claim(Changeset, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Contract{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
         id = ContractID,
         legal_agreement = LA
-    }} = get_contract(PartyID, ContractID, C).
+    } = get_contract(ContractID, Client).
 
 -spec contract_report_preferences_modification(config()) -> _.
 contract_report_preferences_modification(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID1,
     Pref1 = #domain_ReportPreferences{},
@@ -254,15 +379,16 @@ contract_report_preferences_modification(C) ->
         ?cm_contract_modification(ContractID, {report_preferences_modification, Pref2})
     ],
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Contract{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
         id = ContractID,
         report_preferences = Pref2
-    }} = get_contract(PartyID, ContractID, C).
+    } = get_contract(ContractID, Client).
 
 -spec shop_creation(config()) -> _.
 shop_creation(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     Details = #domain_ShopDetails{
         name = <<"SOME SHOP NAME">>,
@@ -288,9 +414,9 @@ shop_creation(C) ->
         ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
     ],
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Shop{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Shop{
         id = ShopID,
         details = Details,
         location = Location,
@@ -299,10 +425,11 @@ shop_creation(C) ->
         contract_id = ContractID,
         payout_tool_id = PayoutToolID1,
         payout_schedule = Schedule
-    }} = get_shop(PartyID, ShopID, C).
+    } = get_shop(ShopID, Client).
 
 -spec shop_complex_modification(config()) -> _.
 shop_complex_modification(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ShopID = ?REAL_SHOP_ID,
     NewCategory = ?cat(3),
@@ -327,18 +454,19 @@ shop_complex_modification(C) ->
         ?cm_shop_modification(ShopID, {cash_register_modification_unit, CashRegisterModificationUnit})
     ],
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Shop{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Shop{
         category = NewCategory,
         details = NewDetails,
         location = NewLocation,
         payout_tool_id = PayoutToolID2,
         payout_schedule = Schedule
-    }} = get_shop(PartyID, ShopID, C).
+    } = get_shop(ShopID, Client).
 
 -spec invalid_cash_register_modification(config()) -> _.
 invalid_cash_register_modification(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     CashRegisterModificationUnit = #claim_management_CashRegisterModificationUnit{
         id = <<"1">>,
@@ -359,10 +487,11 @@ invalid_cash_register_modification(C) ->
             AnotherShopID/binary, "\">>}}}">>,
     {exception, #claim_management_InvalidChangeset{
         reason = Reason
-    }} = accept_claim(Claim, C).
+    }} = accept_claim(Claim, Client).
 
 -spec shop_contract_modification(config()) -> _.
 shop_contract_modification(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ShopID = ?REAL_SHOP_ID,
     ContractID = ?REAL_CONTRACT_ID2,
@@ -373,29 +502,31 @@ shop_contract_modification(C) ->
     },
     Modifications = [?cm_shop_modification(ShopID, {contract_modification, ShopContractParams})],
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Shop{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Shop{
         contract_id = ContractID,
         payout_tool_id = PayoutToolID
-    }} = get_shop(PartyID, ShopID, C).
+    } = get_shop(ShopID, Client).
 
 -spec contract_termination(config()) -> _.
 contract_termination(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID1,
     Reason = #claim_management_ContractTermination{reason = <<"Because!">>},
     Modifications = [?cm_contract_modification(ContractID, {termination, Reason})],
     Claim = claim(Modifications, PartyID),
-    ok = accept_claim(Claim, C),
-    ok = commit_claim(Claim, C),
-    {ok, #domain_Contract{
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{
         id = ContractID,
         status = {terminated, _}
-    }} = get_contract(PartyID, ContractID, C).
+    } = get_contract(ContractID, Client).
 
 -spec contractor_already_exists(config()) -> _.
 contractor_already_exists(C) ->
+    Client = cfg(client, C),
     ContractorParams = pm_ct_helper:make_battle_ready_contractor(),
     PartyID = cfg(party_id, C),
     ContractorID = ?REAL_CONTRACTOR_ID1,
@@ -406,10 +537,11 @@ contractor_already_exists(C) ->
             ContractorID/binary, "\">>}}}">>,
     {exception, #claim_management_InvalidChangeset{
         reason = Reason
-    }} = accept_claim(Claim, C).
+    }} = accept_claim(Claim, Client).
 
 -spec contract_already_exists(config()) -> _.
 contract_already_exists(C) ->
+    Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContractParams = make_contract_params(?REAL_CONTRACTOR_ID1),
     ContractID = ?REAL_CONTRACT_ID1,
@@ -420,10 +552,11 @@ contract_already_exists(C) ->
             ContractID/binary, "\">>}}}">>,
     {exception, #claim_management_InvalidChangeset{
         reason = Reason
-    }} = accept_claim(Claim, C).
+    }} = accept_claim(Claim, Client).
 
 -spec contract_already_terminated(config()) -> _.
 contract_already_terminated(C) ->
+    Client = cfg(client, C),
     ContractID = ?REAL_CONTRACT_ID1,
     PartyID = cfg(party_id, C),
     Reason = #claim_management_ContractTermination{reason = <<"Because!">>},
@@ -435,10 +568,11 @@ contract_already_terminated(C) ->
     ErrorReasonSize = erlang:byte_size(ErrorReason),
     {exception, #claim_management_InvalidChangeset{
         reason = <<ErrorReason:ErrorReasonSize/binary, _/binary>>
-    }} = accept_claim(Claim, C).
+    }} = accept_claim(Claim, Client).
 
 -spec shop_already_exists(config()) -> _.
 shop_already_exists(C) ->
+    Client = cfg(client, C),
     Details = #domain_ShopDetails{
         name = <<"SOME SHOP NAME">>,
         description = <<"Very meaningfull description of the shop.">>
@@ -464,69 +598,44 @@ shop_already_exists(C) ->
             "\">>}}}">>,
     {exception, #claim_management_InvalidChangeset{
         reason = Reason
-    }} = accept_claim(Claim, C).
+    }} = accept_claim(Claim, Client).
 
 %%% Internal functions
 
 claim(PartyModifications, PartyID) ->
-    UserInfo = #claim_management_UserInfo{
-        id = <<"test">>,
-        email = <<"test@localhost">>,
-        username = <<"test">>,
-        type = {internal_user, #claim_management_InternalUser{}}
-    },
-    #claim_management_Claim{
-        id = id(),
-        party_id = PartyID,
-        status = {pending, #claim_management_ClaimPending{}},
-        changeset = [?cm_party_modification(id(), ts(), Mod, UserInfo) || Mod <- PartyModifications],
-        revision = 1,
-        created_at = ts()
-    }.
+    pm_ct_helper:create_claim(PartyModifications, PartyID).
 
-id() ->
-    erlang:unique_integer([positive, monotonic]).
+accept_claim(Claim, Client) ->
+    pm_ct_helper:accept_claim(Claim, Client).
 
-ts() ->
-    pm_datetime:format_now().
+commit_claim(Claim, Client) ->
+    pm_ct_helper:commit_claim(Claim, Client).
+
+%%
 
 cfg(Key, C) ->
     pm_ct_helper:cfg(Key, C).
 
-call(Function, Args, C) ->
-    ApiClient = cfg(api_client, C),
-    PartyID = cfg(party_id, C),
-    Result = pm_client_api:call(claim_committer, Function, [PartyID | Args], ApiClient),
-    map_call_result(Result).
+%%
 
-accept_claim(Claim, C) ->
-    call('Accept', [Claim], C).
-
-commit_claim(Claim, C) ->
-    call('Commit', [Claim], C).
-
-map_call_result({ok, ok}) ->
-    ok;
-map_call_result(Other) ->
-    Other.
-
-call_pm(Fun, Args, C) ->
-    ApiClient = cfg(api_client, C),
-    Result = pm_client_api:call(party_management, Fun, [undefined | Args], ApiClient),
-    map_call_result(Result).
-
-create_party(PartyID, ContactInfo, C) ->
+create_party(ContactInfo, Client) ->
     Params = #payproc_PartyParams{contact_info = ContactInfo},
-    call_pm('Create', [PartyID, Params], C).
+    pm_client:create_party(Params, Client).
 
-get_party(PartyID, C) ->
-    call_pm('Get', [PartyID], C).
+get_party(Client) ->
+    pm_client:get_party(Client).
 
-get_contract(PartyID, ContractID, C) ->
-    call_pm('GetContract', [PartyID, ContractID], C).
+get_party_revision(Client) ->
+    pm_client:get_party_revision(Client).
 
-get_shop(PartyID, ShopID, C) ->
-    call_pm('GetShop', [PartyID, ShopID], C).
+checkout_party_revision(Revision, Client) ->
+    pm_client:checkout_party(Revision, Client).
+
+get_contract(ContractID, Client) ->
+    pm_client:get_contract(ContractID, Client).
+
+get_shop(ShopID, Client) ->
+    pm_client:get_shop(ShopID, Client).
 
 make_contract_params(ContractorID) ->
     make_contract_params(ContractorID, undefined).

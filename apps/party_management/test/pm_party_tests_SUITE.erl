@@ -1,5 +1,7 @@
 -module(pm_party_tests_SUITE).
 
+-include("claim_management.hrl").
+
 -include_lib("party_management/test/pm_ct_domain.hrl").
 -include_lib("party_management/include/party_events.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -20,19 +22,11 @@
 -export([party_already_exists/1]).
 -export([party_retrieval/1]).
 
--export([claim_already_accepted_on_accept/1]).
--export([claim_already_accepted_on_deny/1]).
--export([claim_already_accepted_on_revoke/1]).
--export([claim_acceptance/1]).
--export([claim_denial/1]).
--export([claim_revocation/1]).
 -export([claim_not_found_on_retrieval/1]).
 -export([no_pending_claims/1]).
--export([complex_claim_acceptance/1]).
 
 -export([party_revisioning/1]).
 -export([party_get_initial_revision/1]).
--export([party_get_revision/1]).
 -export([party_blocking/1]).
 -export([party_unblocking/1]).
 -export([party_already_blocked/1]).
@@ -49,13 +43,9 @@
 -export([party_metadata_retrieval/1]).
 -export([party_metadata_removing/1]).
 
--export([shop_not_found_on_retrieval/1]).
 -export([shop_creation/1]).
+-export([shop_not_found_on_retrieval/1]).
 -export([shop_terms_retrieval/1]).
--export([shop_already_exists/1]).
--export([shop_update/1]).
--export([shop_update_before_confirm/1]).
--export([shop_update_with_bad_params/1]).
 -export([shop_blocking/1]).
 -export([shop_unblocking/1]).
 -export([shop_already_blocked/1]).
@@ -71,29 +61,17 @@
 
 -export([party_access_control/1]).
 
+-export([contractor_creation/1]).
+
 -export([contract_not_found/1]).
 -export([contract_creation/1]).
 -export([contract_terms_retrieval/1]).
--export([contract_already_exists/1]).
--export([contract_termination/1]).
--export([contract_already_terminated/1]).
--export([contract_expiration/1]).
--export([contract_legal_agreement_binding/1]).
--export([contract_report_preferences_modification/1]).
--export([contract_payout_tool_creation/1]).
--export([contract_payout_tool_modification/1]).
--export([contract_adjustment_creation/1]).
--export([contract_adjustment_expiration/1]).
 -export([contract_p2p_terms/1]).
 -export([contract_p2p_template_terms/1]).
 -export([contract_w2w_terms/1]).
 
 -export([compute_payment_institution_terms/1]).
 -export([compute_payout_cash_flow/1]).
-
--export([contractor_creation/1]).
--export([contractor_modification/1]).
--export([contract_w_contractor_creation/1]).
 
 -export([compute_provider_ok/1]).
 -export([compute_provider_not_found/1]).
@@ -137,9 +115,7 @@ all() ->
         {group, contract_management},
         {group, shop_management},
         {group, shop_account_lazy_creation},
-        {group, contractor_management},
 
-        {group, claim_management},
         {group, compute},
         {group, terms}
     ].
@@ -160,8 +136,7 @@ groups() ->
         {party_revisioning, [sequence], [
             party_creation,
             party_get_initial_revision,
-            party_revisioning,
-            party_get_revision
+            party_revisioning
         ]},
         {party_blocking_suspension, [sequence], [
             party_creation,
@@ -191,18 +166,9 @@ groups() ->
         {contract_management, [sequence], [
             party_creation,
             contract_not_found,
+            contractor_creation,
             contract_creation,
             contract_terms_retrieval,
-            contract_already_exists,
-            contract_termination,
-            contract_already_terminated,
-            contract_expiration,
-            contract_legal_agreement_binding,
-            contract_report_preferences_modification,
-            contract_adjustment_creation,
-            contract_adjustment_expiration,
-            contract_payout_tool_creation,
-            contract_payout_tool_modification,
             compute_payment_institution_terms,
             contract_p2p_terms,
             contract_p2p_template_terms,
@@ -210,14 +176,11 @@ groups() ->
         ]},
         {shop_management, [sequence], [
             party_creation,
+            contractor_creation,
             contract_creation,
             shop_not_found_on_retrieval,
-            shop_update_before_confirm,
-            shop_update_with_bad_params,
             shop_creation,
             shop_terms_retrieval,
-            shop_already_exists,
-            shop_update,
             compute_payout_cash_flow,
             {group, shop_blocking_suspension}
         ]},
@@ -232,34 +195,15 @@ groups() ->
             shop_activation,
             shop_already_active
         ]},
-        {contractor_management, [sequence], [
-            party_creation,
-            contractor_creation,
-            contractor_modification,
-            contract_w_contractor_creation
-        ]},
         {shop_account_lazy_creation, [sequence], [
             party_creation,
+            contractor_creation,
             contract_creation,
             shop_creation,
             shop_account_set_retrieval,
             shop_account_retrieval
         ]},
-        {claim_management, [sequence], [
-            party_creation,
-            contract_creation,
-            claim_not_found_on_retrieval,
-            claim_already_accepted_on_revoke,
-            claim_already_accepted_on_accept,
-            claim_already_accepted_on_deny,
-            shop_creation,
-            claim_acceptance,
-            claim_denial,
-            claim_revocation,
-            no_pending_claims,
-            complex_claim_acceptance,
-            no_pending_claims
-        ]},
+
         {compute, [parallel], [
             compute_provider_ok,
             compute_provider_not_found,
@@ -273,6 +217,7 @@ groups() ->
         ]},
         {terms, [sequence], [
             party_creation,
+            contractor_creation,
             compute_pred_w_irreducible_criterion,
             compute_terms_w_criteria,
             check_all_payment_methods
@@ -299,13 +244,13 @@ init_per_group(shop_blocking_suspension, C) ->
     C;
 init_per_group(Group, C) ->
     PartyID = list_to_binary(lists:concat([Group, ".", erlang:system_time()])),
-    ApiClient = pm_ct_helper:create_client(PartyID),
-    Client = pm_client_party:start(PartyID, ApiClient),
+    Context = pm_ct_helper:create_client(PartyID),
+    Client = pm_client:start(PartyID, Context),
     [{party_id, PartyID}, {client, Client} | C].
 
 -spec end_per_group(group_name(), config()) -> _.
 end_per_group(_Group, C) ->
-    pm_client_party:stop(cfg(client, C)).
+    pm_client:stop(cfg(client, C)).
 
 -spec init_per_testcase(test_case_name(), config()) -> config().
 init_per_testcase(_Name, C) ->
@@ -447,6 +392,7 @@ end_per_testcase(_Name, _C) ->
 -define(REAL_CONTRACTOR_ID, <<"CONTRACTOR1">>).
 -define(REAL_CONTRACT_ID, <<"CONTRACT1">>).
 -define(REAL_WALLET_ID, <<"WALLET1">>).
+-define(REAL_PAYOUT_TOOL_ID, <<"PAYOUTTOOL1">>).
 -define(REAL_PARTY_PAYMENT_METHODS, [
     ?pmt(bank_card_deprecated, maestro),
     ?pmt(bank_card_deprecated, mastercard),
@@ -461,26 +407,12 @@ end_per_testcase(_Name, _C) ->
 -spec party_retrieval(config()) -> _ | no_return().
 
 -spec shop_not_found_on_retrieval(config()) -> _ | no_return().
--spec shop_creation(config()) -> _ | no_return().
 -spec shop_terms_retrieval(config()) -> _ | no_return().
--spec shop_already_exists(config()) -> _ | no_return().
--spec shop_update(config()) -> _ | no_return().
--spec shop_update_before_confirm(config()) -> _ | no_return().
--spec shop_update_with_bad_params(config()) -> _ | no_return().
 
 -spec party_get_initial_revision(config()) -> _ | no_return().
 -spec party_revisioning(config()) -> _ | no_return().
--spec party_get_revision(config()) -> _ | no_return().
-
--spec claim_already_accepted_on_revoke(config()) -> _ | no_return().
--spec claim_already_accepted_on_accept(config()) -> _ | no_return().
--spec claim_already_accepted_on_deny(config()) -> _ | no_return().
--spec claim_acceptance(config()) -> _ | no_return().
--spec claim_denial(config()) -> _ | no_return().
--spec claim_revocation(config()) -> _ | no_return().
 -spec claim_not_found_on_retrieval(config()) -> _ | no_return().
 -spec no_pending_claims(config()) -> _ | no_return().
--spec complex_claim_acceptance(config()) -> _ | no_return().
 
 -spec party_blocking(config()) -> _ | no_return().
 -spec party_unblocking(config()) -> _ | no_return().
@@ -513,26 +445,14 @@ end_per_testcase(_Name, _C) ->
 -spec party_access_control(config()) -> _ | no_return().
 
 -spec contract_not_found(config()) -> _ | no_return().
+-spec contractor_creation(config()) -> _ | no_return().
 -spec contract_creation(config()) -> _ | no_return().
 -spec contract_terms_retrieval(config()) -> _ | no_return().
--spec contract_already_exists(config()) -> _ | no_return().
--spec contract_termination(config()) -> _ | no_return().
--spec contract_already_terminated(config()) -> _ | no_return().
--spec contract_expiration(config()) -> _ | no_return().
--spec contract_legal_agreement_binding(config()) -> _ | no_return().
--spec contract_report_preferences_modification(config()) -> _ | no_return().
--spec contract_payout_tool_creation(config()) -> _ | no_return().
--spec contract_payout_tool_modification(config()) -> _ | no_return().
--spec contract_adjustment_creation(config()) -> _ | no_return().
--spec contract_adjustment_expiration(config()) -> _ | no_return().
 -spec compute_payment_institution_terms(config()) -> _ | no_return().
 -spec compute_payout_cash_flow(config()) -> _ | no_return().
 -spec contract_p2p_terms(config()) -> _ | no_return().
 -spec contract_p2p_template_terms(config()) -> _ | no_return().
 -spec contract_w2w_terms(config()) -> _ | no_return().
--spec contractor_creation(config()) -> _ | no_return().
--spec contractor_modification(config()) -> _ | no_return().
--spec contract_w_contractor_creation(config()) -> _ | no_return().
 
 -spec compute_provider_ok(config()) -> _ | no_return().
 -spec compute_provider_not_found(config()) -> _ | no_return().
@@ -551,122 +471,115 @@ party_creation(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContactInfo = #domain_PartyContactInfo{email = <<?MODULE_STRING>>},
-    ok = pm_client_party:create(make_party_params(ContactInfo), Client),
+    ok = pm_client:create_party(make_party_params(ContactInfo), Client),
     [
         ?party_created(PartyID, ContactInfo, _),
         ?revision_changed(_, 0)
     ] = next_event(Client),
-    Party = pm_client_party:get(Client),
+    Party = pm_client:get_party(Client),
     ?party_w_status(PartyID, ?unblocked(_, _), ?active(_)) = Party,
     #domain_Party{contact_info = ContactInfo, shops = Shops, contracts = Contracts} = Party,
     0 = maps:size(Shops),
     0 = maps:size(Contracts).
 
 party_already_exists(C) ->
-    ?party_exists() = pm_client_party:create(make_party_params(), cfg(client, C)).
+    ?party_exists() = pm_client:create_party(make_party_params(), cfg(client, C)).
 
 party_not_found_on_retrieval(C) ->
-    ?party_not_found() = pm_client_party:get(cfg(client, C)).
+    ?party_not_found() = pm_client:get_party(cfg(client, C)).
 
 party_retrieval(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
-    #domain_Party{id = PartyID} = pm_client_party:get(Client).
+    #domain_Party{id = PartyID} = pm_client:get_party(Client).
 
 party_get_initial_revision(C) ->
     % NOTE
     % This triggers `pm_party_machine:get_last_revision_old_way/1` codepath.
     Client = cfg(client, C),
-    0 = pm_client_party:get_revision(Client).
+    0 = pm_client:get_party_revision(Client).
 
 party_revisioning(C) ->
     Client = cfg(client, C),
     % yesterday
     T0 = pm_datetime:add_interval(pm_datetime:format_now(), {undefined, undefined, -1}),
-    ?invalid_party_revision() = pm_client_party:checkout({timestamp, T0}, Client),
-    Party1 = pm_client_party:get(Client),
+    ?invalid_party_revision() = pm_client:checkout_party({timestamp, T0}, Client),
+    Party1 = pm_client:get_party(Client),
     R1 = Party1#domain_Party.revision,
     T1 = pm_datetime:format_now(),
     Party2 = party_suspension(C),
     R2 = Party2#domain_Party.revision,
-    Party1 = pm_client_party:checkout({timestamp, T1}, Client),
-    Party1 = pm_client_party:checkout({revision, R1}, Client),
+    Party1 = pm_client:checkout_party({timestamp, T1}, Client),
+    Party1 = pm_client:checkout_party({revision, R1}, Client),
     T2 = pm_datetime:format_now(),
     _ = party_activation(C),
-    Party2 = pm_client_party:checkout({timestamp, T2}, Client),
-    Party2 = pm_client_party:checkout({revision, R2}, Client),
-    Party3 = pm_client_party:get(Client),
+    Party2 = pm_client:checkout_party({timestamp, T2}, Client),
+    Party2 = pm_client:checkout_party({revision, R2}, Client),
+    Party3 = pm_client:get_party(Client),
     R3 = Party3#domain_Party.revision,
     % tomorrow
     T3 = pm_datetime:add_interval(T2, {undefined, undefined, 1}),
-    Party3 = pm_client_party:checkout({timestamp, T3}, Client),
-    Party3 = pm_client_party:checkout({revision, R3}, Client),
-    ?invalid_party_revision() = pm_client_party:checkout({revision, R3 + 1}, Client).
-
-party_get_revision(C) ->
-    Client = cfg(client, C),
-    Party1 = pm_client_party:get(Client),
-    R1 = Party1#domain_Party.revision,
-    R1 = pm_client_party:get_revision(Client),
-    Party1 = #domain_Party{revision = R1} = pm_client_party:checkout({revision, R1}, Client),
-    Changeset = create_change_set(0),
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    R1 = pm_client_party:get_revision(Client),
-    ok = accept_claim(Claim, Client),
-    R2 = pm_client_party:get_revision(Client),
-    R2 = R1 + 1,
-    Party2 = #domain_Party{revision = R2} = pm_client_party:checkout({revision, R2}, Client),
-    % some more
-    Max = 7,
-    Claims = [
-        assert_claim_pending(pm_client_party:create_claim(create_change_set(Num), Client), Client)
-     || Num <- lists:seq(1, Max)
-    ],
-    R2 = pm_client_party:get_revision(Client),
-    Party2 = pm_client_party:checkout({revision, R2}, Client),
-    _Oks = [accept_claim(Cl, Client) || Cl <- Claims],
-    R3 = pm_client_party:get_revision(Client),
-    R3 = R2 + Max,
-    #domain_Party{revision = R3} = pm_client_party:checkout({revision, R3}, Client).
-
-create_change_set(ID) ->
-    ContractParams = make_contract_params(),
-    PayoutToolParams = pm_ct_helper:make_battle_ready_payout_tool_params(),
-    BinaryID = erlang:integer_to_binary(ID),
-    ContractID = <<?REAL_CONTRACT_ID/binary, BinaryID/binary>>,
-    PayoutToolID = <<"1">>,
-    [
-        ?contract_modification(ContractID, {creation, ContractParams}),
-        ?contract_modification(ContractID, ?payout_tool_creation(PayoutToolID, PayoutToolParams))
-    ].
+    Party3 = pm_client:checkout_party({timestamp, T3}, Client),
+    Party3 = pm_client:checkout_party({revision, R3}, Client),
+    ?invalid_party_revision() = pm_client:checkout_party({revision, R3 + 1}, Client).
 
 contract_not_found(C) ->
-    ?contract_not_found() = pm_client_party:get_contract(<<"666">>, cfg(client, C)).
+    ?contract_not_found() = pm_client:get_contract(<<"666">>, cfg(client, C)).
+
+contractor_creation(C) ->
+    Client = cfg(client, C),
+    PartyID = cfg(party_id, C),
+    ContractorID = ?REAL_CONTRACTOR_ID,
+    ContractorParams = pm_ct_helper:make_battle_ready_contractor(),
+    Modifications = [
+        ?cm_contractor_creation(ContractorID, ContractorParams)
+    ],
+    Claim = create_claim(Modifications, PartyID),
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    Party = pm_client:get_party(Client),
+    #domain_PartyContractor{} = pm_party:get_contractor(ContractorID, Party).
 
 contract_creation(C) ->
     Client = cfg(client, C),
-    ContractParams = make_contract_params(),
-    PayoutToolParams = pm_ct_helper:make_battle_ready_payout_tool_params(),
+    PartyID = cfg(party_id, C),
+    ContractorID = ?REAL_CONTRACTOR_ID,
     ContractID = ?REAL_CONTRACT_ID,
-    PayoutToolID = <<"1">>,
-    Changeset = [
-        ?contract_modification(ContractID, {creation, ContractParams}),
-        ?contract_modification(ContractID, ?payout_tool_creation(PayoutToolID, PayoutToolParams))
+    TemplateRef = undefined,
+    PaymentInstitutionRef = ?pinst(2),
+    ContractParams = #claim_management_ContractParams{
+        contractor_id = ContractorID,
+        template = TemplateRef,
+        payment_institution = PaymentInstitutionRef
+    },
+    PayoutToolParams = #claim_management_PayoutToolParams{
+        currency = ?cur(<<"RUB">>),
+        tool_info =
+            {russian_bank_account, #domain_RussianBankAccount{
+                account = <<"4276300010908312893">>,
+                bank_name = <<"SomeBank">>,
+                bank_post_account = <<"123129876">>,
+                bank_bik = <<"66642666">>
+            }}
+    },
+    Modifications = [
+        ?cm_contract_creation(ContractID, ContractParams),
+        ?cm_contract_modification(ContractID, ?cm_payout_tool_creation(?REAL_PAYOUT_TOOL_ID, PayoutToolParams))
     ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
+    Claim = create_claim(Modifications, PartyID),
     ok = accept_claim(Claim, Client),
-    #domain_Contract{id = ContractID, payout_tools = PayoutTools} = pm_client_party:get_contract(ContractID, Client),
-    true = lists:keymember(PayoutToolID, #domain_PayoutTool.id, PayoutTools).
+    ok = commit_claim(Claim, Client),
+    #domain_Contract{} = pm_client:get_contract(?REAL_CONTRACT_ID, Client).
 
 contract_terms_retrieval(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID,
     Varset = #payproc_Varset{},
-    PartyRevision = pm_client_party:get_revision(Client),
+    PartyRevision = pm_client:get_party_revision(Client),
     DomainRevision1 = pm_domain:head(),
     Timstamp1 = pm_datetime:format_now(),
-    TermSet1 = pm_client_party:compute_contract_terms(
+    TermSet1 = pm_client:compute_contract_terms(
         ContractID,
         Timstamp1,
         {revision, PartyRevision},
@@ -682,7 +595,7 @@ contract_terms_retrieval(C) ->
     _ = pm_domain:update(construct_term_set_for_party(PartyID, undefined)),
     DomainRevision2 = pm_domain:head(),
     Timstamp2 = pm_datetime:format_now(),
-    TermSet2 = pm_client_party:compute_contract_terms(
+    TermSet2 = pm_client:compute_contract_terms(
         ContractID,
         Timstamp2,
         {revision, PartyRevision},
@@ -696,235 +609,11 @@ contract_terms_retrieval(C) ->
         }
     } = TermSet2.
 
-contract_already_exists(C) ->
-    Client = cfg(client, C),
-    ContractParams = make_contract_params(),
-    ContractID = ?REAL_CONTRACT_ID,
-    Changeset = [?contract_modification(ContractID, {creation, ContractParams})],
-    ?invalid_changeset(
-        ?invalid_contract(
-            ContractID,
-            {already_exists, ContractID}
-        )
-    ) = pm_client_party:create_claim(Changeset, Client).
-
-contract_termination(C) ->
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    Changeset = [?contract_modification(ContractID, ?contract_termination(<<"WHY NOT?!">>))],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{
-        id = ContractID,
-        status = {terminated, _}
-    } = pm_client_party:get_contract(ContractID, Client).
-
-contract_already_terminated(C) ->
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    Changeset = [
-        ?contract_modification(ContractID, ?contract_termination(<<"JUST TO BE SURE.">>))
-    ],
-    ?invalid_changeset(
-        ?invalid_contract(
-            ContractID,
-            {invalid_status, _}
-        )
-    ) = pm_client_party:create_claim(Changeset, Client).
-
-contract_expiration(C) ->
-    Client = cfg(client, C),
-    ContractParams = make_contract_params(?tmpl(3)),
-    PayoutToolParams = pm_ct_helper:make_battle_ready_payout_tool_params(),
-    ContractID = <<"CONTRACT_EXPIRED">>,
-    Changeset = [
-        ?contract_modification(ContractID, {creation, ContractParams}),
-        ?contract_modification(ContractID, ?payout_tool_creation(<<"1">>, PayoutToolParams))
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{
-        id = ContractID,
-        status = {expired, _}
-    } = pm_client_party:get_contract(ContractID, Client).
-
-contract_legal_agreement_binding(C) ->
-    % FIXME how about already terminated contract?
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    LA = #domain_LegalAgreement{
-        signed_at = pm_datetime:format_now(),
-        legal_agreement_id = <<"20160123-0031235-OGM/GDM">>
-    },
-    Changeset = [?contract_modification(ContractID, {legal_agreement_binding, LA})],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{
-        id = ContractID,
-        legal_agreement = LA
-    } = pm_client_party:get_contract(ContractID, Client).
-
-contract_report_preferences_modification(C) ->
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    Pref1 = #domain_ReportPreferences{},
-    Pref2 = #domain_ReportPreferences{
-        service_acceptance_act_preferences = #domain_ServiceAcceptanceActPreferences{
-            schedule = ?bussched(1),
-            signer = #domain_Representative{
-                position = <<"69">>,
-                full_name = <<"Generic Name">>,
-                document = {articles_of_association, #domain_ArticlesOfAssociation{}}
-            }
-        }
-    },
-    Changeset = [
-        ?contract_modification(ContractID, {report_preferences_modification, Pref1}),
-        ?contract_modification(ContractID, {report_preferences_modification, Pref2})
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{
-        id = ContractID,
-        report_preferences = Pref2
-    } = pm_client_party:get_contract(ContractID, Client).
-
-contract_payout_tool_creation(C) ->
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    PayoutToolID1 = <<"2">>,
-    PayoutToolParams1 = #payproc_PayoutToolParams{
-        currency = ?cur(<<"RUB">>),
-        tool_info =
-            {russian_bank_account, #domain_RussianBankAccount{
-                account = <<"4276300010908312893">>,
-                bank_name = <<"SomeBank">>,
-                bank_post_account = <<"123129876">>,
-                bank_bik = <<"66642666">>
-            }}
-    },
-    PayoutToolID2 = <<"3">>,
-    PayoutToolParams2 = #payproc_PayoutToolParams{
-        currency = ?cur(<<"USD">>),
-        tool_info =
-            {international_bank_account, #domain_InternationalBankAccount{
-                bank = #domain_InternationalBankDetails{
-                    name = <<"SomeBank">>,
-                    address = <<"Bahamas">>,
-                    bic = <<"66642666">>
-                },
-                iban = <<"DC6664266612312312">>
-            }}
-    },
-    PayoutToolID3 = <<"4">>,
-    PayoutToolParams3 = #payproc_PayoutToolParams{
-        currency = ?cur(<<"USD">>),
-        tool_info =
-            {wallet_info, #domain_WalletInfo{
-                wallet_id = <<"123">>
-            }}
-    },
-    Changeset = [
-        ?contract_modification(ContractID, ?payout_tool_creation(PayoutToolID1, PayoutToolParams1)),
-        ?contract_modification(ContractID, ?payout_tool_creation(PayoutToolID2, PayoutToolParams2)),
-        ?contract_modification(ContractID, ?payout_tool_creation(PayoutToolID3, PayoutToolParams3))
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{
-        id = ContractID,
-        payout_tools = PayoutTools
-    } = pm_client_party:get_contract(ContractID, Client),
-    true = lists:keymember(PayoutToolID1, #domain_PayoutTool.id, PayoutTools),
-    true = lists:keymember(PayoutToolID2, #domain_PayoutTool.id, PayoutTools),
-    true = lists:keymember(PayoutToolID3, #domain_PayoutTool.id, PayoutTools).
-
-contract_payout_tool_modification(C) ->
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    PayoutToolID = <<"3">>,
-    ToolInfo =
-        {international_bank_account, #domain_InternationalBankAccount{
-            number = <<"123456789">>,
-            bank = #domain_InternationalBankDetails{
-                name = <<"ABetterBank">>,
-                address = <<"Burkina Faso">>,
-                bic = <<"BCAOBFBFBOB">>
-            },
-            correspondent_account = #domain_InternationalBankAccount{
-                number = <<"1111222233334444">>
-            },
-            iban = <<"BF42BF0840101300463574000390">>
-        }},
-    Changeset = [
-        ?contract_modification(ContractID, ?payout_tool_info_modification(PayoutToolID, ToolInfo))
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{
-        id = ContractID,
-        payout_tools = PayoutTools
-    } = pm_client_party:get_contract(ContractID, Client),
-    #domain_PayoutTool{payout_tool_info = ToolInfo} = lists:keyfind(
-        PayoutToolID,
-        #domain_PayoutTool.id,
-        PayoutTools
-    ).
-
-contract_adjustment_creation(C) ->
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    ID = <<"ADJ1">>,
-    AdjustmentParams = #payproc_ContractAdjustmentParams{
-        template = #domain_ContractTemplateRef{id = 2}
-    },
-    Changeset = [?contract_modification(ContractID, ?adjustment_creation(ID, AdjustmentParams))],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{
-        id = ContractID,
-        adjustments = Adjustments
-    } = pm_client_party:get_contract(ContractID, Client),
-    true = lists:keymember(ID, #domain_ContractAdjustment.id, Adjustments).
-
-contract_adjustment_expiration(C) ->
-    Client = cfg(client, C),
-    ok = pm_context:save(pm_context:create()),
-    ContractID = ?REAL_CONTRACT_ID,
-    ID = <<"ADJ2">>,
-    Revision = pm_domain:head(),
-    Terms = pm_party:get_terms(
-        pm_client_party:get_contract(ContractID, Client),
-        pm_datetime:format_now(),
-        Revision
-    ),
-    AdjustmentParams = #payproc_ContractAdjustmentParams{
-        template = #domain_ContractTemplateRef{id = 4}
-    },
-    Changeset = [?contract_modification(ContractID, ?adjustment_creation(ID, AdjustmentParams))],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{
-        id = ContractID,
-        adjustments = Adjustments
-    } = pm_client_party:get_contract(ContractID, Client),
-    true = lists:keymember(ID, #domain_ContractAdjustment.id, Adjustments),
-    true =
-        Terms /=
-            pm_party:get_terms(
-                pm_client_party:get_contract(ContractID, Client),
-                pm_datetime:format_now(),
-                Revision
-            ),
-    AfterExpiration = pm_datetime:add_interval(pm_datetime:format_now(), {0, 1, 1}),
-    Terms = pm_party:get_terms(pm_client_party:get_contract(ContractID, Client), AfterExpiration, Revision),
-    pm_context:cleanup().
-
 compute_payment_institution_terms(C) ->
     Client = cfg(client, C),
     TermsFun = fun(Type, Object) ->
         #domain_TermSet{} =
-            pm_client_party:compute_payment_institution_terms(
+            pm_client:compute_payment_institution_terms(
                 ?pinst(2),
                 #payproc_Varset{payment_method = ?pmt(Type, Object)},
                 Client
@@ -932,7 +621,7 @@ compute_payment_institution_terms(C) ->
     end,
     T1 =
         #domain_TermSet{} =
-        pm_client_party:compute_payment_institution_terms(
+        pm_client:compute_payment_institution_terms(
             ?pinst(2),
             #payproc_Varset{},
             Client
@@ -953,7 +642,7 @@ check_all_payment_methods(C) ->
     Client = cfg(client, C),
     TermsFun = fun(Type, Object) ->
         #domain_TermSet{} =
-            pm_client_party:compute_payment_institution_terms(
+            pm_client:compute_payment_institution_terms(
                 ?pinst(2),
                 #payproc_Varset{payment_method = ?pmt(Type, Object)},
                 Client
@@ -992,12 +681,12 @@ compute_payout_cash_flow(C) ->
             destination = #domain_FinalCashFlowAccount{account_type = {system, settlement}},
             volume = #domain_Cash{amount = 2500, currency = ?cur(<<"RUB">>)}
         }
-    ] = pm_client_party:compute_payout_cash_flow(Params, Client).
+    ] = pm_client:compute_payout_cash_flow(Params, Client).
 
 contract_p2p_terms(C) ->
     Client = cfg(client, C),
     ContractID = ?REAL_CONTRACT_ID,
-    PartyRevision = pm_client_party:get_revision(Client),
+    PartyRevision = pm_client:get_party_revision(Client),
     DomainRevision1 = pm_domain:head(),
     Timstamp1 = pm_datetime:format_now(),
     BankCard = #domain_BankCard{
@@ -1019,7 +708,7 @@ contract_p2p_terms(C) ->
         wallets = #domain_WalletServiceTerms{
             p2p = P2PServiceTerms
         }
-    } = pm_client_party:compute_contract_terms(
+    } = pm_client:compute_contract_terms(
         ContractID,
         Timstamp1,
         {revision, PartyRevision},
@@ -1035,7 +724,7 @@ contract_p2p_terms(C) ->
 contract_p2p_template_terms(C) ->
     Client = cfg(client, C),
     ContractID = ?REAL_CONTRACT_ID,
-    PartyRevision = pm_client_party:get_revision(Client),
+    PartyRevision = pm_client:get_party_revision(Client),
     DomainRevision1 = pm_domain:head(),
     Timstamp1 = pm_datetime:format_now(),
     Varset = #payproc_Varset{
@@ -1048,7 +737,7 @@ contract_p2p_template_terms(C) ->
                 templates = TemplateTerms
             }
         }
-    } = pm_client_party:compute_contract_terms(
+    } = pm_client:compute_contract_terms(
         ContractID,
         Timstamp1,
         {revision, PartyRevision},
@@ -1062,7 +751,7 @@ contract_p2p_template_terms(C) ->
 contract_w2w_terms(C) ->
     Client = cfg(client, C),
     ContractID = ?REAL_CONTRACT_ID,
-    PartyRevision = pm_client_party:get_revision(Client),
+    PartyRevision = pm_client:get_party_revision(Client),
     DomainRevision1 = pm_domain:head(),
     Timstamp1 = pm_datetime:format_now(),
     Varset = #payproc_Varset{
@@ -1073,7 +762,7 @@ contract_w2w_terms(C) ->
         wallets = #domain_WalletServiceTerms{
             w2w = W2WServiceTerms
         }
-    } = pm_client_party:compute_contract_terms(
+    } = pm_client:compute_contract_terms(
         ContractID,
         Timstamp1,
         {revision, PartyRevision},
@@ -1088,33 +777,48 @@ contract_w2w_terms(C) ->
 
 shop_not_found_on_retrieval(C) ->
     Client = cfg(client, C),
-    ?shop_not_found() = pm_client_party:get_shop(<<"666">>, Client).
+    ?shop_not_found() = pm_client:get_shop(<<"666">>, Client).
 
+-spec shop_creation(config()) -> _.
 shop_creation(C) ->
     Client = cfg(client, C),
-    Details = pm_ct_helper:make_shop_details(<<"THRIFT SHOP">>, <<"Hot. Fancy. Almost free.">>),
+    PartyID = cfg(party_id, C),
+    Details = #domain_ShopDetails{
+        name = <<"SOME SHOP NAME">>,
+        description = <<"Very meaningfull description of the shop.">>
+    },
+    Category = ?cat(2),
+    Location = {url, <<"https://example.com">>},
     ContractID = ?REAL_CONTRACT_ID,
     ShopID = ?REAL_SHOP_ID,
-    Params = #payproc_ShopParams{
-        category = ?cat(2),
-        location = {url, <<"https://somename.somedomain/p/123?redirect=1">>},
+    PayoutToolID1 = ?REAL_PAYOUT_TOOL_ID,
+    ShopParams = #claim_management_ShopParams{
+        category = Category,
+        location = Location,
         details = Details,
         contract_id = ContractID,
-        payout_tool_id = pm_ct_helper:get_first_payout_tool_id(ContractID, Client)
+        payout_tool_id = PayoutToolID1
     },
-    ShopAccountParams = #payproc_ShopAccountParams{currency = ?cur(<<"RUB">>)},
-    Changeset = [
-        ?shop_modification(ShopID, {creation, Params}),
-        ?shop_modification(ShopID, {shop_account_creation, ShopAccountParams})
+    Schedule = ?bussched(1),
+    ScheduleParams = #claim_management_ScheduleModification{schedule = Schedule},
+    Modifications = [
+        ?cm_shop_creation(ShopID, ShopParams),
+        ?cm_shop_account_creation(ShopID, ?cur(<<"RUB">>)),
+        ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
     ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ?claim(_, _, Changeset) = Claim,
+    Claim = create_claim(Modifications, PartyID),
     ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
     #domain_Shop{
         id = ShopID,
         details = Details,
-        account = #domain_ShopAccount{currency = ?cur(<<"RUB">>)}
-    } = pm_client_party:get_shop(ShopID, Client).
+        location = Location,
+        category = Category,
+        account = #domain_ShopAccount{currency = ?cur(<<"RUB">>)},
+        contract_id = ContractID,
+        payout_tool_id = PayoutToolID1,
+        payout_schedule = Schedule
+    } = pm_client:get_shop(ShopID, Client).
 
 shop_terms_retrieval(C) ->
     Client = cfg(client, C),
@@ -1128,270 +832,52 @@ shop_terms_retrieval(C) ->
         currency = ?cur(<<"RUB">>),
         identification_level = full
     },
-    TermSet1 = pm_client_party:compute_shop_terms(ShopID, Timestamp, {timestamp, Timestamp}, VS, Client),
+    TermSet1 = pm_client:compute_shop_terms(ShopID, Timestamp, {timestamp, Timestamp}, VS, Client),
     #domain_TermSet{
         payments = #domain_PaymentsServiceTerms{
             payment_methods = {value, [?pmt(bank_card_deprecated, visa)]}
         }
     } = TermSet1,
     _ = pm_domain:update(construct_term_set_for_party(PartyID, {shop_is, ShopID})),
-    TermSet2 = pm_client_party:compute_shop_terms(ShopID, pm_datetime:format_now(), {timestamp, Timestamp}, VS, Client),
+    TermSet2 = pm_client:compute_shop_terms(ShopID, pm_datetime:format_now(), {timestamp, Timestamp}, VS, Client),
     #domain_TermSet{
         payments = #domain_PaymentsServiceTerms{
             payment_methods = {value, ?REAL_PARTY_PAYMENT_METHODS}
         }
     } = TermSet2.
 
-shop_already_exists(C) ->
-    Client = cfg(client, C),
-    Details = pm_ct_helper:make_shop_details(<<"THRlFT SHOP">>, <<"Hot. Fancy. Almost like thrift.">>),
-    ContractID = ?REAL_CONTRACT_ID,
-    ShopID = ?REAL_SHOP_ID,
-    Params = #payproc_ShopParams{
-        category = ?cat(2),
-        location = {url, <<"https://s0mename.s0med0main">>},
-        details = Details,
-        contract_id = ContractID,
-        payout_tool_id = pm_ct_helper:get_first_payout_tool_id(ContractID, Client)
-    },
-    Changeset = [?shop_modification(ShopID, {creation, Params})],
-    ?invalid_changeset(?invalid_shop(ShopID, {already_exists, _})) = pm_client_party:create_claim(Changeset, Client).
+% shop_update_with_bad_params(C) ->
+%     % FIXME add more invalid params checks
+%     Client = cfg(client, C),
+%     ShopID = <<"SHOP2">>,
+%     ContractID = <<"CONTRACT3">>,
+%     ContractParams = make_contract_params(#domain_ContractTemplateRef{id = 5}),
+%     PayoutToolParams = pm_ct_helper:make_battle_ready_payout_tool_params(),
+%     Changeset = [
+%         ?contract_modification(ContractID, {creation, ContractParams}),
+%         ?contract_modification(ContractID, ?payout_tool_creation(<<"1">>, PayoutToolParams))
+%     ],
+%     Claim = assert_claim_pending(pm_client:create_claim(Changeset, Client), Client),
+%     ok = accept_claim(Claim, Client),
 
-shop_update(C) ->
-    Client = cfg(client, C),
-    ShopID = ?REAL_SHOP_ID,
-    Details = pm_ct_helper:make_shop_details(<<"BARBER SHOP">>, <<"Nice. Short. Clean.">>),
-    Changeset1 = [?shop_modification(ShopID, {details_modification, Details})],
-    Claim1 = assert_claim_pending(pm_client_party:create_claim(Changeset1, Client), Client),
-    ok = accept_claim(Claim1, Client),
-    #domain_Shop{details = Details} = pm_client_party:get_shop(ShopID, Client),
-
-    Location = {url, <<"suspicious_url">>},
-    Changeset2 = [?shop_modification(ShopID, {location_modification, Location})],
-    Claim2 = assert_claim_pending(pm_client_party:create_claim(Changeset2, Client), Client),
-    ok = accept_claim(Claim2, Client),
-    #domain_Shop{location = Location, details = Details} = pm_client_party:get_shop(ShopID, Client),
-
-    PayoutToolParams = pm_ct_helper:make_battle_ready_payout_tool_params(),
-    ContractID = <<"CONTRACT_IN_DIFFERENT_PAYMENT_INST">>,
-    PayoutToolID = <<"1">>,
-    Changeset3 = [
-        ?contract_modification(ContractID, {creation, make_contract_params(?tmpl(2), ?pinst(3))}),
-        ?contract_modification(ContractID, ?payout_tool_creation(PayoutToolID, PayoutToolParams)),
-        ?shop_modification(ShopID, ?shop_contract_modification(ContractID, PayoutToolID))
-    ],
-    Claim3 = assert_claim_pending(pm_client_party:create_claim(Changeset3, Client), Client),
-    ok = accept_claim(Claim3, Client),
-    #domain_Shop{
-        location = Location,
-        details = Details,
-        contract_id = ContractID,
-        payout_tool_id = PayoutToolID
-    } = pm_client_party:get_shop(ShopID, Client).
-
-shop_update_before_confirm(C) ->
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    ShopID = <<"SHOP2">>,
-    Params = #payproc_ShopParams{
-        location = {url, <<"">>},
-        details = pm_ct_helper:make_shop_details(<<"THRIFT SHOP">>, <<"Hot. Fancy. Almost free.">>),
-        contract_id = ContractID,
-        payout_tool_id = pm_ct_helper:get_first_payout_tool_id(ContractID, Client)
-    },
-    Changeset1 = [?shop_modification(ShopID, {creation, Params})],
-    Claim0 = assert_claim_pending(pm_client_party:create_claim(Changeset1, Client), Client),
-    ?shop_not_found() = pm_client_party:get_shop(ShopID, Client),
-    NewCategory = ?cat(3),
-    NewDetails = pm_ct_helper:make_shop_details(<<"BARBIES SHOP">>, <<"Hot. Short. Clean.">>),
-    ShopAccountParams = #payproc_ShopAccountParams{currency = ?cur(<<"RUB">>)},
-    Changeset2 = [
-        ?shop_modification(ShopID, {category_modification, NewCategory}),
-        ?shop_modification(ShopID, {details_modification, NewDetails}),
-        ?shop_modification(ShopID, {shop_account_creation, ShopAccountParams})
-    ],
-    ok = update_claim(Claim0, Changeset2, Client),
-    Claim1 = pm_client_party:get_claim(pm_claim:get_id(Claim0), Client),
-    ok = accept_claim(Claim1, Client),
-    #domain_Shop{category = NewCategory, details = NewDetails} = pm_client_party:get_shop(ShopID, Client).
-
-shop_update_with_bad_params(C) ->
-    % FIXME add more invalid params checks
-    Client = cfg(client, C),
-    ShopID = <<"SHOP2">>,
-    ContractID = <<"CONTRACT3">>,
-    ContractParams = make_contract_params(#domain_ContractTemplateRef{id = 5}),
-    PayoutToolParams = pm_ct_helper:make_battle_ready_payout_tool_params(),
-    Changeset = [
-        ?contract_modification(ContractID, {creation, ContractParams}),
-        ?contract_modification(ContractID, ?payout_tool_creation(<<"1">>, PayoutToolParams))
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-
-    Claim1 =
-        #payproc_Claim{id = ID1, revision = Rev1} = assert_claim_pending(
-            pm_client_party:create_claim(
-                [?shop_modification(ShopID, {category_modification, ?cat(1)})],
-                Client
-            ),
-            Client
-        ),
-    ?invalid_changeset(_CategoryError) = pm_client_party:accept_claim(ID1, Rev1, Client),
-    ok = revoke_claim(Claim1, Client).
-
-claim_acceptance(C) ->
-    Client = cfg(client, C),
-    ShopID = ?REAL_SHOP_ID,
-    Details = pm_ct_helper:make_shop_details(<<"McDolan">>),
-    Location = {url, <<"very_suspicious_url">>},
-    Changeset = [
-        ?shop_modification(ShopID, {details_modification, Details}),
-        ?shop_modification(ShopID, {location_modification, Location})
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Shop{location = Location, details = Details} = pm_client_party:get_shop(ShopID, Client).
-
-claim_denial(C) ->
-    Client = cfg(client, C),
-    ShopID = ?REAL_SHOP_ID,
-    Shop = pm_client_party:get_shop(ShopID, Client),
-    Location = {url, <<"Pr0nHub">>},
-    Changeset = [?shop_modification(ShopID, {location_modification, Location})],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = deny_claim(Claim, Client),
-    Shop = pm_client_party:get_shop(ShopID, Client).
-
-claim_revocation(C) ->
-    Client = cfg(client, C),
-    Party = pm_client_party:get(Client),
-    ShopID = <<"SHOP3">>,
-    ContractID = ?REAL_CONTRACT_ID,
-    Params = #payproc_ShopParams{
-        location = {url, <<"https://url3">>},
-        details = pm_ct_helper:make_shop_details(<<"OOPS">>),
-        contract_id = ContractID,
-        payout_tool_id = <<"1">>
-    },
-    Changeset = [?shop_modification(ShopID, {creation, Params})],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = revoke_claim(Claim, Client),
-    Party = pm_client_party:get(Client),
-    ?shop_not_found() = pm_client_party:get_shop(ShopID, Client).
-
-complex_claim_acceptance(C) ->
-    Client = cfg(client, C),
-    ContractID = ?REAL_CONTRACT_ID,
-    ShopID1 = <<"SHOP4">>,
-    Params1 = #payproc_ShopParams{
-        location = {url, <<"https://url4">>},
-        category = ?cat(2),
-        details = Details1 = pm_ct_helper:make_shop_details(<<"SHOP4">>),
-        contract_id = ContractID,
-        payout_tool_id = <<"1">>
-    },
-    ShopID2 = <<"SHOP5">>,
-    Params2 = #payproc_ShopParams{
-        location = {url, <<"http://url5">>},
-        category = ?cat(3),
-        details = Details2 = pm_ct_helper:make_shop_details(<<"SHOP5">>),
-        contract_id = ContractID,
-        payout_tool_id = <<"1">>
-    },
-    ShopAccountParams = #payproc_ShopAccountParams{currency = ?cur(<<"RUB">>)},
-    Claim1 = assert_claim_pending(
-        pm_client_party:create_claim(
-            [
-                ?shop_modification(ShopID1, {creation, Params1}),
-                ?shop_modification(ShopID1, {shop_account_creation, ShopAccountParams})
-            ],
-            Client
-        ),
-        Client
-    ),
-    ok = pm_client_party:suspend(Client),
-    [?party_suspension(?suspended(_)), ?revision_changed(_, _)] = next_event(Client),
-    ok = pm_client_party:activate(Client),
-    [?party_suspension(?active(_)), ?revision_changed(_, _)] = next_event(Client),
-    Claim1 = pm_client_party:get_claim(pm_claim:get_id(Claim1), Client),
-
-    Claim2 = assert_claim_pending(
-        pm_client_party:create_claim(
-            [
-                ?shop_modification(ShopID2, {creation, Params2}),
-                ?shop_modification(ShopID2, {shop_account_creation, ShopAccountParams})
-            ],
-            Client
-        ),
-        Client
-    ),
-    ok = update_claim(Claim1, [?shop_modification(ShopID1, {category_modification, ?cat(3)})], Client),
-    Claim1_1 = pm_client_party:get_claim(pm_claim:get_id(Claim1), Client),
-    true = Claim1#payproc_Claim.changeset =/= Claim1_1#payproc_Claim.changeset,
-    true = Claim1#payproc_Claim.revision =/= Claim1_1#payproc_Claim.revision,
-    ok = accept_claim(Claim2, Client),
-    ok = accept_claim(Claim1_1, Client),
-    #domain_Shop{details = Details1, category = ?cat(3)} = pm_client_party:get_shop(ShopID1, Client),
-    #domain_Shop{details = Details2} = pm_client_party:get_shop(ShopID2, Client).
-
-claim_already_accepted_on_revoke(C) ->
-    Client = cfg(client, C),
-    Reason = <<"The End is near">>,
-    Claim = get_first_accepted_claim(Client),
-    ?invalid_claim_status(?accepted(_)) = pm_client_party:revoke_claim(
-        pm_claim:get_id(Claim),
-        pm_claim:get_revision(Claim),
-        Reason,
-        Client
-    ).
-
-claim_already_accepted_on_accept(C) ->
-    Client = cfg(client, C),
-    Claim = get_first_accepted_claim(Client),
-    ?invalid_claim_status(?accepted(_)) = pm_client_party:accept_claim(
-        pm_claim:get_id(Claim),
-        pm_claim:get_revision(Claim),
-        Client
-    ).
-
-claim_already_accepted_on_deny(C) ->
-    Client = cfg(client, C),
-    Reason = <<"I am about to destroy them">>,
-    Claim = get_first_accepted_claim(Client),
-    ?invalid_claim_status(?accepted(_)) = pm_client_party:deny_claim(
-        pm_claim:get_id(Claim),
-        pm_claim:get_revision(Claim),
-        Reason,
-        Client
-    ).
-
-get_first_accepted_claim(Client) ->
-    Claims = lists:filter(
-        fun(?claim(_, Status)) ->
-            case Status of
-                ?accepted(_) ->
-                    true;
-                _ ->
-                    false
-            end
-        end,
-        pm_client_party:get_claims(Client)
-    ),
-    case Claims of
-        [Claim | _] ->
-            Claim;
-        [] ->
-            error(accepted_claim_not_found)
-    end.
+%     Claim1 =
+%         #payproc_Claim{id = ID1, revision = Rev1} = assert_claim_pending(
+%             pm_client:create_claim(
+%                 [?shop_modification(ShopID, {category_modification, ?cat(1)})],
+%                 Client
+%             ),
+%             Client
+%         ),
+%     ?invalid_changeset(_CategoryError) = pm_client:accept_claim(ID1, Rev1, Client),
+%     ok = revoke_claim(Claim1, Client).
 
 claim_not_found_on_retrieval(C) ->
     Client = cfg(client, C),
-    ?claim_not_found() = pm_client_party:get_claim(-666, Client).
+    ?claim_not_found() = pm_client:get_claim(-666, Client).
 
 no_pending_claims(C) ->
     Client = cfg(client, C),
-    Claims = pm_client_party:get_claims(Client),
+    Claims = pm_client:get_claims(Client),
     [] = lists:filter(
         fun
             (?claim(_, ?pending())) ->
@@ -1407,95 +893,95 @@ party_blocking(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     Reason = <<"i said so">>,
-    ok = pm_client_party:block(Reason, Client),
+    ok = pm_client:block_party(Reason, Client),
     [?party_blocking(?blocked(Reason, _)), ?revision_changed(_, _)] = next_event(Client),
-    ?party_w_status(PartyID, ?blocked(Reason, _), _) = pm_client_party:get(Client).
+    ?party_w_status(PartyID, ?blocked(Reason, _), _) = pm_client:get_party(Client).
 
 party_unblocking(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     Reason = <<"enough">>,
-    ok = pm_client_party:unblock(Reason, Client),
+    ok = pm_client:unblock_party(Reason, Client),
     [?party_blocking(?unblocked(Reason, _)), ?revision_changed(_, _)] = next_event(Client),
-    ?party_w_status(PartyID, ?unblocked(Reason, _), _) = pm_client_party:get(Client).
+    ?party_w_status(PartyID, ?unblocked(Reason, _), _) = pm_client:get_party(Client).
 
 party_already_blocked(C) ->
     Client = cfg(client, C),
-    ?party_blocked(_) = pm_client_party:block(<<"too much">>, Client).
+    ?party_blocked(_) = pm_client:block_party(<<"too much">>, Client).
 
 party_already_unblocked(C) ->
     Client = cfg(client, C),
-    ?party_unblocked(_) = pm_client_party:unblock(<<"too free">>, Client).
+    ?party_unblocked(_) = pm_client:unblock_party(<<"too free">>, Client).
 
 party_blocked_on_suspend(C) ->
     Client = cfg(client, C),
-    ?party_blocked(_) = pm_client_party:suspend(Client).
+    ?party_blocked(_) = pm_client:suspend_party(Client).
 
 party_suspension(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
-    ok = pm_client_party:suspend(Client),
+    ok = pm_client:suspend_party(Client),
     [?party_suspension(?suspended(_)), ?revision_changed(_, _)] = next_event(Client),
-    ?party_w_status(PartyID, _, ?suspended(_)) = pm_client_party:get(Client).
+    ?party_w_status(PartyID, _, ?suspended(_)) = pm_client:get_party(Client).
 
 party_activation(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
-    ok = pm_client_party:activate(Client),
+    ok = pm_client:activate_party(Client),
     [?party_suspension(?active(_)), ?revision_changed(_, _)] = next_event(Client),
-    ?party_w_status(PartyID, _, ?active(_)) = pm_client_party:get(Client).
+    ?party_w_status(PartyID, _, ?active(_)) = pm_client:get_party(Client).
 
 party_already_suspended(C) ->
     Client = cfg(client, C),
-    ?party_suspended() = pm_client_party:suspend(Client).
+    ?party_suspended() = pm_client:suspend_party(Client).
 
 party_already_active(C) ->
     Client = cfg(client, C),
-    ?party_active() = pm_client_party:activate(Client).
+    ?party_active() = pm_client:activate_party(Client).
 
 party_metadata_setting(C) ->
     Client = cfg(client, C),
     NS = pm_ct_helper:make_meta_ns(),
     Data = pm_ct_helper:make_meta_data(NS),
-    ok = pm_client_party:set_metadata(NS, Data, Client),
+    ok = pm_client:set_party_metadata(NS, Data, Client),
     % lets check for idempotency
-    ok = pm_client_party:set_metadata(NS, Data, Client).
+    ok = pm_client:set_party_metadata(NS, Data, Client).
 
 party_metadata_retrieval(C) ->
     Client = cfg(client, C),
-    ?namespace_not_found() = pm_client_party:get_metadata(<<"NoSuchNamespace">>, Client),
+    ?namespace_not_found() = pm_client:get_party_metadata(<<"NoSuchNamespace">>, Client),
     NS = pm_ct_helper:make_meta_ns(),
     Data0 = pm_ct_helper:make_meta_data(),
-    ok = pm_client_party:set_metadata(NS, Data0, Client),
-    Data0 = pm_client_party:get_metadata(NS, Client),
+    ok = pm_client:set_party_metadata(NS, Data0, Client),
+    Data0 = pm_client:get_party_metadata(NS, Client),
     % lets change it and check again
     Data1 = pm_ct_helper:make_meta_data(NS),
-    ok = pm_client_party:set_metadata(NS, Data1, Client),
-    Data1 = pm_client_party:get_metadata(NS, Client).
+    ok = pm_client:set_party_metadata(NS, Data1, Client),
+    Data1 = pm_client:get_party_metadata(NS, Client).
 
 party_metadata_removing(C) ->
     Client = cfg(client, C),
-    ?namespace_not_found() = pm_client_party:remove_metadata(<<"NoSuchNamespace">>, Client),
+    ?namespace_not_found() = pm_client:remove_party_metadata(<<"NoSuchNamespace">>, Client),
     NS = pm_ct_helper:make_meta_ns(),
-    ok = pm_client_party:set_metadata(NS, pm_ct_helper:make_meta_data(), Client),
-    ok = pm_client_party:remove_metadata(NS, Client),
-    ?namespace_not_found() = pm_client_party:remove_metadata(NS, Client).
+    ok = pm_client:set_party_metadata(NS, pm_ct_helper:make_meta_data(), Client),
+    ok = pm_client:remove_party_metadata(NS, Client),
+    ?namespace_not_found() = pm_client:remove_party_metadata(NS, Client).
 
 party_meta_retrieval(C) ->
     Client = cfg(client, C),
-    Meta0 = pm_client_party:get_meta(Client),
+    Meta0 = pm_client:get_party_meta(Client),
     NS = pm_ct_helper:make_meta_ns(),
-    ok = pm_client_party:set_metadata(NS, pm_ct_helper:make_meta_data(), Client),
-    Meta1 = pm_client_party:get_meta(Client),
+    ok = pm_client:set_party_metadata(NS, pm_ct_helper:make_meta_data(), Client),
+    Meta1 = pm_client:get_party_meta(Client),
     Meta0 =/= Meta1.
 
 party_get_status(C) ->
     Client = cfg(client, C),
-    Status0 = pm_client_party:get_status(Client),
+    Status0 = pm_client:get_party_status(Client),
     ?active(_) = Status0#domain_PartyStatus.suspension,
     ?unblocked(_) = Status0#domain_PartyStatus.blocking,
-    ok = pm_client_party:block(<<"too much">>, Client),
-    Status1 = pm_client_party:get_status(Client),
+    ok = pm_client:block_party(<<"too much">>, Client),
+    Status1 = pm_client:get_party_status(Client),
     ?active(_) = Status1#domain_PartyStatus.suspension,
     ?blocked(<<"too much">>, _) = Status1#domain_PartyStatus.blocking,
     Status1 =/= Status0.
@@ -1504,116 +990,67 @@ shop_blocking(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
     Reason = <<"i said so">>,
-    ok = pm_client_party:block_shop(ShopID, Reason, Client),
+    ok = pm_client:block_shop(ShopID, Reason, Client),
     [?shop_blocking(ShopID, ?blocked(Reason, _)), ?revision_changed(_, _)] = next_event(Client),
-    ?shop_w_status(ShopID, ?blocked(Reason, _), _) = pm_client_party:get_shop(ShopID, Client).
+    ?shop_w_status(ShopID, ?blocked(Reason, _), _) = pm_client:get_shop(ShopID, Client).
 
 shop_unblocking(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
     Reason = <<"enough">>,
-    ok = pm_client_party:unblock_shop(ShopID, Reason, Client),
+    ok = pm_client:unblock_shop(ShopID, Reason, Client),
     [?shop_blocking(ShopID, ?unblocked(Reason, _)), ?revision_changed(_, _)] = next_event(Client),
-    ?shop_w_status(ShopID, ?unblocked(Reason, _), _) = pm_client_party:get_shop(ShopID, Client).
+    ?shop_w_status(ShopID, ?unblocked(Reason, _), _) = pm_client:get_shop(ShopID, Client).
 
 shop_already_blocked(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
-    ?shop_blocked(_) = pm_client_party:block_shop(ShopID, <<"too much">>, Client).
+    ?shop_blocked(_) = pm_client:block_shop(ShopID, <<"too much">>, Client).
 
 shop_already_unblocked(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
-    ?shop_unblocked(_) = pm_client_party:unblock_shop(ShopID, <<"too free">>, Client).
+    ?shop_unblocked(_) = pm_client:unblock_shop(ShopID, <<"too free">>, Client).
 
 shop_blocked_on_suspend(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
-    ?shop_blocked(_) = pm_client_party:suspend_shop(ShopID, Client).
+    ?shop_blocked(_) = pm_client:suspend_shop(ShopID, Client).
 
 shop_suspension(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
-    ok = pm_client_party:suspend_shop(ShopID, Client),
+    ok = pm_client:suspend_shop(ShopID, Client),
     [?shop_suspension(ShopID, ?suspended(_)), ?revision_changed(_, _)] = next_event(Client),
-    ?shop_w_status(ShopID, _, ?suspended(_)) = pm_client_party:get_shop(ShopID, Client).
+    ?shop_w_status(ShopID, _, ?suspended(_)) = pm_client:get_shop(ShopID, Client).
 
 shop_activation(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
-    ok = pm_client_party:activate_shop(ShopID, Client),
+    ok = pm_client:activate_shop(ShopID, Client),
     [?shop_suspension(ShopID, ?active(_)), ?revision_changed(_, _)] = next_event(Client),
-    ?shop_w_status(ShopID, _, ?active(_)) = pm_client_party:get_shop(ShopID, Client).
+    ?shop_w_status(ShopID, _, ?active(_)) = pm_client:get_shop(ShopID, Client).
 
 shop_already_suspended(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
-    ?shop_suspended() = pm_client_party:suspend_shop(ShopID, Client).
+    ?shop_suspended() = pm_client:suspend_shop(ShopID, Client).
 
 shop_already_active(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
-    ?shop_active() = pm_client_party:activate_shop(ShopID, Client).
+    ?shop_active() = pm_client:activate_shop(ShopID, Client).
 
 shop_account_set_retrieval(C) ->
     Client = cfg(client, C),
     ShopID = ?REAL_SHOP_ID,
-    S = #domain_ShopAccount{} = pm_client_party:get_shop_account(ShopID, Client),
+    S = #domain_ShopAccount{} = pm_client:get_shop_account(ShopID, Client),
     {save_config, S}.
 
 shop_account_retrieval(C) ->
     Client = cfg(client, C),
     {shop_account_set_retrieval, #domain_ShopAccount{guarantee = AccountID}} = ?config(saved_config, C),
-    #payproc_AccountState{account_id = AccountID} = pm_client_party:get_account_state(AccountID, Client).
-
-%%
-
-contractor_creation(C) ->
-    Client = cfg(client, C),
-    ContractorParams = make_contractor_params(),
-    ContractorID = ?REAL_CONTRACTOR_ID,
-    Changeset = [
-        ?contractor_modification(ContractorID, {creation, ContractorParams})
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    Party = pm_client_party:get(Client),
-    #domain_PartyContractor{} = pm_party:get_contractor(ContractorID, Party).
-
-contractor_modification(C) ->
-    Client = cfg(client, C),
-    ContractorID = ?REAL_CONTRACTOR_ID,
-    Party1 = pm_client_party:get(Client),
-    #domain_PartyContractor{} = C1 = pm_party:get_contractor(ContractorID, Party1),
-    Changeset = [
-        ?contractor_modification(ContractorID, {identification_level_modification, full}),
-        ?contractor_modification(
-            ContractorID,
-            {
-                identity_documents_modification,
-                #payproc_ContractorIdentityDocumentsModification{
-                    identity_documents = [<<"some_binary">>, <<"and_even_more_binary">>]
-                }
-            }
-        )
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    Party2 = pm_client_party:get(Client),
-    #domain_PartyContractor{} = C2 = pm_party:get_contractor(ContractorID, Party2),
-    C1 /= C2 orelse error(same_contractor).
-
-contract_w_contractor_creation(C) ->
-    Client = cfg(client, C),
-    ContractorID = ?REAL_CONTRACTOR_ID,
-    ContractParams = make_contract_w_contractor_params(ContractorID),
-    ContractID = ?REAL_CONTRACT_ID,
-    Changeset = [
-        ?contract_modification(ContractID, {creation, ContractParams})
-    ],
-    Claim = assert_claim_pending(pm_client_party:create_claim(Changeset, Client), Client),
-    ok = accept_claim(Claim, Client),
-    #domain_Contract{id = ContractID, contractor_id = ContractorID} = pm_client_party:get_contract(ContractID, Client).
+    #payproc_AccountState{account_id = AccountID} = pm_client:get_account_state(AccountID, Client).
 
 %% Access control tests
 
@@ -1621,16 +1058,16 @@ party_access_control(C) ->
     PartyID = cfg(party_id, C),
     % External Success
     GoodExternalClient = cfg(client, C),
-    #domain_Party{id = PartyID} = pm_client_party:get(GoodExternalClient),
+    #domain_Party{id = PartyID} = pm_client:get_party(GoodExternalClient),
 
     % External Reject
-    BadExternalClient0 = pm_client_party:start(
+    BadExternalClient0 = pm_client:start(
         #payproc_UserInfo{id = <<"FakE1D">>, type = {external_user, #payproc_ExternalUser{}}},
         PartyID,
         pm_client_api:new()
     ),
-    ?invalid_user() = pm_client_party:get(BadExternalClient0),
-    pm_client_party:stop(BadExternalClient0),
+    ?invalid_user() = pm_client:get_party(BadExternalClient0),
+    pm_client:stop(BadExternalClient0),
 
     % UserIdentity has priority
     UserIdentity = #{
@@ -1638,31 +1075,31 @@ party_access_control(C) ->
         realm => <<"internal">>
     },
     Context = woody_user_identity:put(UserIdentity, woody_context:new()),
-    UserIdentityClient1 = pm_client_party:start(
+    UserIdentityClient1 = pm_client:start(
         #payproc_UserInfo{id = <<"FakE1D">>, type = {external_user, #payproc_ExternalUser{}}},
         PartyID,
         pm_client_api:new(Context)
     ),
-    #domain_Party{id = PartyID} = pm_client_party:get(UserIdentityClient1),
-    pm_client_party:stop(UserIdentityClient1),
+    #domain_Party{id = PartyID} = pm_client:get_party(UserIdentityClient1),
+    pm_client:stop(UserIdentityClient1),
 
     % Internal Success
-    GoodInternalClient = pm_client_party:start(
+    GoodInternalClient = pm_client:start(
         #payproc_UserInfo{id = <<"F4KE1D">>, type = {internal_user, #payproc_InternalUser{}}},
         PartyID,
         pm_client_api:new()
     ),
-    #domain_Party{id = PartyID} = pm_client_party:get(GoodInternalClient),
-    pm_client_party:stop(GoodInternalClient),
+    #domain_Party{id = PartyID} = pm_client:get_party(GoodInternalClient),
+    pm_client:stop(GoodInternalClient),
 
     % Service Success
-    GoodServiceClient = pm_client_party:start(
+    GoodServiceClient = pm_client:start(
         #payproc_UserInfo{id = <<"fAkE1D">>, type = {service_user, #payproc_ServiceUser{}}},
         PartyID,
         pm_client_api:new()
     ),
-    #domain_Party{id = PartyID} = pm_client_party:get(GoodServiceClient),
-    pm_client_party:stop(GoodServiceClient),
+    #domain_Party{id = PartyID} = pm_client:get_party(GoodServiceClient),
+    pm_client:stop(GoodServiceClient),
     ok.
 
 %% Compute providers
@@ -1692,13 +1129,13 @@ compute_provider_ok(C) ->
                 cash_value = {value, ?cash(1000, <<"RUB">>)}
             }
         }
-    } = pm_client_party:compute_provider(?prv(1), DomainRevision, Varset, Client).
+    } = pm_client:compute_provider(?prv(1), DomainRevision, Varset, Client).
 
 compute_provider_not_found(C) ->
     Client = cfg(client, C),
     DomainRevision = pm_domain:head(),
     {exception, #payproc_ProviderNotFound{}} =
-        (catch pm_client_party:compute_provider(?prv(?WRONG_DMT_OBJ_ID), DomainRevision, #payproc_Varset{}, Client)).
+        (catch pm_client:compute_provider(?prv(?WRONG_DMT_OBJ_ID), DomainRevision, #payproc_Varset{}, Client)).
 
 compute_provider_terminal_terms_ok(C) ->
     Client = cfg(client, C),
@@ -1725,13 +1162,13 @@ compute_provider_terminal_terms_ok(C) ->
         recurrent_paytools = #domain_RecurrentPaytoolsProvisionTerms{
             cash_value = {value, ?cash(1000, <<"RUB">>)}
         }
-    } = pm_client_party:compute_provider_terminal_terms(?prv(1), ?trm(1), DomainRevision, Varset, Client).
+    } = pm_client:compute_provider_terminal_terms(?prv(1), ?trm(1), DomainRevision, Varset, Client).
 
 compute_provider_terminal_terms_not_found(C) ->
     Client = cfg(client, C),
     DomainRevision = pm_domain:head(),
     {exception, #payproc_TerminalNotFound{}} =
-        (catch pm_client_party:compute_provider_terminal_terms(
+        (catch pm_client:compute_provider_terminal_terms(
             ?prv(1),
             ?trm(?WRONG_DMT_OBJ_ID),
             DomainRevision,
@@ -1739,7 +1176,7 @@ compute_provider_terminal_terms_not_found(C) ->
             Client
         )),
     {exception, #payproc_ProviderNotFound{}} =
-        (catch pm_client_party:compute_provider_terminal_terms(
+        (catch pm_client:compute_provider_terminal_terms(
             ?prv(?WRONG_DMT_OBJ_ID),
             ?trm(1),
             DomainRevision,
@@ -1747,7 +1184,7 @@ compute_provider_terminal_terms_not_found(C) ->
             Client
         )),
     {exception, #payproc_ProviderNotFound{}} =
-        (catch pm_client_party:compute_provider_terminal_terms(
+        (catch pm_client:compute_provider_terminal_terms(
             ?prv(?WRONG_DMT_OBJ_ID),
             ?trm(?WRONG_DMT_OBJ_ID),
             DomainRevision,
@@ -1760,7 +1197,7 @@ compute_provider_terminal_terms_undefined_terms(C) ->
     DomainRevision = pm_domain:head(),
     ?assertMatch(
         {exception, #payproc_ProvisionTermSetUndefined{}},
-        pm_client_party:compute_provider_terminal_terms(
+        pm_client:compute_provider_terminal_terms(
             ?prv(2),
             ?trm(4),
             DomainRevision,
@@ -1775,7 +1212,7 @@ compute_globals_ok(C) ->
     Varset = #payproc_Varset{},
     #domain_Globals{
         external_account_set = {value, ?eas(1)}
-    } = pm_client_party:compute_globals(DomainRevision, Varset, Client).
+    } = pm_client:compute_globals(DomainRevision, Varset, Client).
 
 compute_payment_routing_ruleset_ok(C) ->
     Client = cfg(client, C),
@@ -1800,7 +1237,7 @@ compute_payment_routing_ruleset_ok(C) ->
                     allowed = {constant, true}
                 }
             ]}
-    } = pm_client_party:compute_routing_ruleset(?ruleset(1), DomainRevision, Varset, Client).
+    } = pm_client:compute_routing_ruleset(?ruleset(1), DomainRevision, Varset, Client).
 
 compute_payment_routing_ruleset_unreducable(C) ->
     Client = cfg(client, C),
@@ -1823,13 +1260,13 @@ compute_payment_routing_ruleset_unreducable(C) ->
                     ruleset = ?ruleset(4)
                 }
             ]}
-    } = pm_client_party:compute_routing_ruleset(?ruleset(1), DomainRevision, Varset, Client).
+    } = pm_client:compute_routing_ruleset(?ruleset(1), DomainRevision, Varset, Client).
 
 compute_payment_routing_ruleset_not_found(C) ->
     Client = cfg(client, C),
     DomainRevision = pm_domain:head(),
     {exception, #payproc_RuleSetNotFound{}} =
-        (catch pm_client_party:compute_routing_ruleset(?ruleset(5), DomainRevision, #payproc_Varset{}, Client)).
+        (catch pm_client:compute_routing_ruleset(?ruleset(5), DomainRevision, #payproc_Varset{}, Client)).
 
 %%
 
@@ -1857,6 +1294,7 @@ compute_pred_w_irreducible_criterion(_) ->
 
 compute_terms_w_criteria(C) ->
     Client = cfg(client, C),
+    PartyID = cfg(party_id, C),
     CritRef = ?crit(1),
     CritBase = ?crit(10),
     TemplateRef = ?tmpl(10),
@@ -1925,14 +1363,15 @@ compute_terms_w_criteria(C) ->
             )
         ],
         fun(Revision) ->
-            ContractID = pm_ct_helper:create_contract(TemplateRef, ?pinst(1), Client),
-            PartyRevision = pm_client_party:get_revision(Client),
+            ContractID = pm_utils:unique_id(),
+            ok = create_contract(PartyID, ContractID, ?REAL_CONTRACTOR_ID, TemplateRef, ?pinst(1), Client),
+            PartyRevision = pm_client:get_party_revision(Client),
             Timstamp = pm_datetime:format_now(),
             ?assertMatch(
                 #domain_TermSet{
                     payments = #domain_PaymentsServiceTerms{cash_limit = {value, CashLimitHigh}}
                 },
-                pm_client_party:compute_contract_terms(
+                pm_client:compute_contract_terms(
                     ContractID,
                     Timstamp,
                     {revision, PartyRevision},
@@ -1948,7 +1387,7 @@ compute_terms_w_criteria(C) ->
                 #domain_TermSet{
                     payments = #domain_PaymentsServiceTerms{cash_limit = {value, CashLimitLow}}
                 },
-                pm_client_party:compute_contract_terms(
+                pm_client:compute_contract_terms(
                     ContractID,
                     Timstamp,
                     {revision, PartyRevision},
@@ -1964,7 +1403,7 @@ compute_terms_w_criteria(C) ->
                 #domain_TermSet{
                     payments = #domain_PaymentsServiceTerms{cash_limit = {value, CashLimitLow}}
                 },
-                pm_client_party:compute_contract_terms(
+                pm_client:compute_contract_terms(
                     ContractID,
                     Timstamp,
                     {revision, PartyRevision},
@@ -1979,40 +1418,43 @@ compute_terms_w_criteria(C) ->
         end
     ).
 
+create_contract(PartyID, ContractID, ContractorID, TemplateRef, PaymentInstitutionRef, Client) ->
+    ContractParams = #claim_management_ContractParams{
+        contractor_id = ContractorID,
+        template = TemplateRef,
+        payment_institution = PaymentInstitutionRef
+    },
+    Modifications = [
+        ?cm_contract_creation(ContractID, ContractParams)
+    ],
+    Claim = create_claim(Modifications, PartyID),
+    ok = accept_claim(Claim, Client),
+    ok = commit_claim(Claim, Client),
+    ok.
+
 %%
 
-update_claim(#payproc_Claim{id = ClaimID, revision = Revision}, Changeset, Client) ->
-    ok = pm_client_party:update_claim(ClaimID, Revision, Changeset, Client),
-    NextRevision = Revision + 1,
-    [?claim_updated(ClaimID, Changeset, NextRevision, _)] = next_event(Client),
+create_claim(Modifications, PartyID) ->
+    pm_ct_helper:create_claim(Modifications, PartyID).
+
+accept_claim(Claim, Client) ->
+    ok = pm_ct_helper:accept_claim(Claim, Client),
+    [] = next_event(Client),
     ok.
 
-accept_claim(#payproc_Claim{id = ClaimID, revision = Revision}, Client) ->
-    ok = pm_client_party:accept_claim(ClaimID, Revision, Client),
-    NextRevision = Revision + 1,
-    [?claim_status_changed(ClaimID, ?accepted(_), NextRevision, _), ?revision_changed(_, _)] = next_event(Client),
+commit_claim(Claim, Client) ->
+    ok = pm_ct_helper:commit_claim(Claim, Client),
+    [
+        ?claim_created(?claim(ClaimID)),
+        ?claim_status_changed(ClaimID, ?accepted(_), _, _),
+        ?revision_changed(_, _)
+    ] = next_event(Client),
     ok.
-
-deny_claim(#payproc_Claim{id = ClaimID, revision = Revision}, Client) ->
-    ok = pm_client_party:deny_claim(ClaimID, Revision, Reason = <<"The Reason">>, Client),
-    NextRevision = Revision + 1,
-    [?claim_status_changed(ClaimID, ?denied(Reason), NextRevision, _)] = next_event(Client),
-    ok.
-
-revoke_claim(#payproc_Claim{id = ClaimID, revision = Revision}, Client) ->
-    ok = pm_client_party:revoke_claim(ClaimID, Revision, undefined, Client),
-    NextRevision = Revision + 1,
-    [?claim_status_changed(ClaimID, ?revoked(undefined), NextRevision, _)] = next_event(Client),
-    ok.
-
-assert_claim_pending(?claim(ClaimID, ?pending()) = Claim, Client) ->
-    [?claim_created(?claim(ClaimID))] = next_event(Client),
-    Claim.
 
 %%
 
 next_event(Client) ->
-    case pm_client_party:pull_event(Client) of
+    case pm_client:pull_event(Client) of
         ?party_ev(Event) ->
             Event;
         Result ->
@@ -2026,25 +1468,6 @@ make_party_params() ->
 
 make_party_params(ContactInfo) ->
     #payproc_PartyParams{contact_info = ContactInfo}.
-
-make_contract_params() ->
-    make_contract_params(undefined).
-
-make_contract_params(TemplateRef) ->
-    make_contract_params(TemplateRef, ?pinst(2)).
-
-make_contract_params(TemplateRef, PaymentInstitutionRef) ->
-    pm_ct_helper:make_battle_ready_contract_params(TemplateRef, PaymentInstitutionRef).
-
-make_contract_w_contractor_params(ContractorID) ->
-    #payproc_ContractParams{
-        contractor_id = ContractorID,
-        template = undefined,
-        payment_institution = ?pinst(2)
-    }.
-
-make_contractor_params() ->
-    pm_ct_helper:make_battle_ready_contractor().
 
 construct_term_set_for_party(PartyID, Def) ->
     TermSet = #domain_TermSet{

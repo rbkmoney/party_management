@@ -141,7 +141,6 @@ process_call_(PartyID, Fun, Args, Machine) ->
         throw:Exception ->
             respond_w_exception(Exception)
     end.
-
 %% Party
 
 handle_call('Block', {_, _PartyID, Reason}, AuxSt, St) ->
@@ -176,63 +175,6 @@ handle_call('RemoveMetaData', {_, _PartyID, NS}, AuxSt, St) ->
     respond(
         ok,
         [?party_meta_removed(NS)],
-        AuxSt,
-        St
-    );
-%% Claim
-
-handle_call('CreateClaim', {_, _PartyID, Changeset}, AuxSt, St) ->
-    ok = assert_party_operable(St),
-    {Claim, Changes} = create_claim(Changeset, St),
-    respond(
-        Claim,
-        Changes,
-        AuxSt,
-        St
-    );
-handle_call('UpdateClaim', {_, _PartyID, ID, ClaimRevision, Changeset}, AuxSt, St) ->
-    ok = assert_party_operable(St),
-    ok = assert_claim_modification_allowed(ID, ClaimRevision, St),
-    respond(
-        ok,
-        update_claim(ID, Changeset, St),
-        AuxSt,
-        St
-    );
-handle_call('AcceptClaim', {_, _PartyID, ID, ClaimRevision}, AuxSt, St) ->
-    ok = assert_claim_modification_allowed(ID, ClaimRevision, St),
-    Timestamp = pm_datetime:format_now(),
-    Revision = get_next_party_revision(St),
-    Claim = pm_claim:accept(
-        Timestamp,
-        pm_domain:head(),
-        get_st_party(St),
-        get_st_claim(ID, St)
-    ),
-    respond(
-        ok,
-        [finalize_claim(Claim, Timestamp), ?revision_changed(Timestamp, Revision)],
-        AuxSt,
-        St
-    );
-handle_call('DenyClaim', {_, _PartyID, ID, ClaimRevision, Reason}, AuxSt, St) ->
-    ok = assert_claim_modification_allowed(ID, ClaimRevision, St),
-    Timestamp = pm_datetime:format_now(),
-    Claim = pm_claim:deny(Reason, Timestamp, get_st_claim(ID, St)),
-    respond(
-        ok,
-        [finalize_claim(Claim, Timestamp)],
-        AuxSt,
-        St
-    );
-handle_call('RevokeClaim', {_, _PartyID, ID, ClaimRevision, Reason}, AuxSt, St) ->
-    ok = assert_party_operable(St),
-    ok = assert_claim_modification_allowed(ID, ClaimRevision, St),
-    Timestamp = pm_datetime:format_now(),
-    Claim = pm_claim:revoke(Reason, Timestamp, get_st_claim(ID, St)),
-    respond(
-        ok,
-        [finalize_claim(Claim, Timestamp)],
         AuxSt,
         St
     );
@@ -592,19 +534,6 @@ get_next_party_revision(#pm_State{party = Party}) ->
 get_st_claim(ID, #pm_State{claims = Claims}) ->
     assert_claim_exists(maps:get(ID, Claims, undefined)).
 
-get_st_pending_claims(#pm_State{claims = Claims}) ->
-    % TODO cache it during history collapse
-    % Looks like little overhead, compared to previous version (based on maps:fold),
-    % but I hope for small amount of pending claims simultaniously.
-    maps:values(
-        maps:filter(
-            fun(_ID, Claim) ->
-                pm_claim:is_pending(Claim)
-            end,
-            Claims
-        )
-    ).
-
 -spec get_st_metadata(meta_ns(), st()) -> meta_data().
 get_st_metadata(NS, #pm_State{meta = Meta}) ->
     case maps:get(NS, Meta, undefined) of
@@ -625,74 +554,7 @@ assert_claim_exists(Claim = #payproc_Claim{}) ->
 assert_claim_exists(undefined) ->
     throw(#payproc_ClaimNotFound{}).
 
-assert_claim_modification_allowed(ID, Revision, St) ->
-    Claim = get_st_claim(ID, St),
-    ok = pm_claim:assert_revision(Claim, Revision),
-    ok = pm_claim:assert_pending(Claim).
-
-assert_claims_not_conflict(Claim, ClaimsPending, Timestamp, Revision, Party) ->
-    ConflictedClaims = lists:dropwhile(
-        fun(PendingClaim) ->
-            pm_claim:get_id(Claim) =:= pm_claim:get_id(PendingClaim) orelse
-                not pm_claim:is_conflicting(Claim, PendingClaim, Timestamp, Revision, Party)
-        end,
-        ClaimsPending
-    ),
-    case ConflictedClaims of
-        [] ->
-            ok;
-        [#payproc_Claim{id = ID} | _] ->
-            throw(#payproc_ChangesetConflict{conflicted_id = ID})
-    end.
-
 %%
-
-create_claim(Changeset, St) ->
-    Timestamp = pm_datetime:format_now(),
-    Revision = pm_domain:head(),
-    Party = get_st_party(St),
-    Claim = pm_claim:create(get_next_claim_id(St), Changeset, Party, Timestamp, Revision),
-    ClaimsPending = get_st_pending_claims(St),
-    % Check for conflicts with other pending claims
-    ok = assert_claims_not_conflict(Claim, ClaimsPending, Timestamp, Revision, Party),
-    % Test if we can safely accept proposed changes.
-    case pm_claim:is_need_acceptance(Claim, Party, Revision) of
-        false ->
-            % Try to submit new accepted claim
-            try
-                AcceptedClaim = pm_claim:accept(Timestamp, Revision, Party, Claim),
-                PartyRevision = get_next_party_revision(St),
-                {
-                    AcceptedClaim,
-                    [
-                        ?claim_created(Claim),
-                        finalize_claim(AcceptedClaim, Timestamp),
-                        ?revision_changed(Timestamp, PartyRevision)
-                    ]
-                }
-            catch
-                throw:_AnyException ->
-                    {Claim, [?claim_created(Claim)]}
-            end;
-        true ->
-            % Submit new pending claim
-            {Claim, [?claim_created(Claim)]}
-    end.
-
-update_claim(ID, Changeset, St) ->
-    Timestamp = pm_datetime:format_now(),
-    Revision = pm_domain:head(),
-    Party = get_st_party(St),
-    Claim = pm_claim:update(
-        Changeset,
-        get_st_claim(ID, St),
-        Party,
-        Timestamp,
-        Revision
-    ),
-    ClaimsPending = get_st_pending_claims(St),
-    ok = assert_claims_not_conflict(Claim, ClaimsPending, Timestamp, Revision, Party),
-    [?claim_updated(ID, Changeset, pm_claim:get_revision(Claim), Timestamp)].
 
 finalize_claim(Claim, Timestamp) ->
     ?claim_status_changed(
@@ -701,10 +563,6 @@ finalize_claim(Claim, Timestamp) ->
         pm_claim:get_revision(Claim),
         Timestamp
     ).
-
-get_next_claim_id(#pm_State{claims = Claims}) ->
-    % TODO cache sequences on history collapse
-    lists:max([0 | maps:keys(Claims)]) + 1.
 
 apply_accepted_claim(Claim, St) ->
     case pm_claim:is_accepted(Claim) of
@@ -716,9 +574,7 @@ apply_accepted_claim(Claim, St) ->
     end.
 
 respond(ok, Changes, AuxSt, St) ->
-    do_respond(ok, Changes, AuxSt, St);
-respond(Response, Changes, AuxSt, St) ->
-    do_respond({ok, Response}, Changes, AuxSt, St).
+    do_respond(ok, Changes, AuxSt, St).
 
 do_respond(Response, Changes, AuxSt0, St) ->
     AuxSt1 = append_party_revision_index(Changes, St, AuxSt0),
@@ -942,10 +798,6 @@ activate(party, Timestamp) ->
     ?party_suspension(?active(Timestamp));
 activate({shop, ID}, Timestamp) ->
     ?shop_suspension(ID, ?active(Timestamp)).
-
-assert_party_operable(St) ->
-    _ = assert_unblocked(party, St),
-    _ = assert_active(party, St).
 
 assert_unblocked(party, St) ->
     assert_blocking(get_st_party(St), unblocked);
