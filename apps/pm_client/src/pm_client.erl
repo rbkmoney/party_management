@@ -28,6 +28,7 @@
 -export([get_contract/2]).
 -export([compute_contract_terms/6]).
 -export([get_shop/2]).
+-export([get_shop_contract/2]).
 -export([compute_shop_terms/5]).
 -export([compute_payment_institution_terms/3]).
 -export([compute_payout_cash_flow/2]).
@@ -190,6 +191,11 @@ compute_payout_cash_flow(Params, Client) ->
 -spec get_shop(shop_id(), pid()) -> dmsl_domain_thrift:'Shop'() | woody_error:business_error().
 get_shop(ID, Client) ->
     map_result_error(gen_server:call(Client, {call, 'GetShop', [ID]})).
+
+-spec get_shop_contract(shop_id(), pid()) ->
+    dmsl_payment_processing_thrift:'ShopContract'() | woody_error:business_error().
+get_shop_contract(ID, Client) ->
+    map_result_error(gen_server:call(Client, {call, 'GetShopContract', [ID]})).
 
 -spec block_shop(shop_id(), binary(), pid()) -> ok | woody_error:business_error().
 block_shop(ID, Reason, Client) ->

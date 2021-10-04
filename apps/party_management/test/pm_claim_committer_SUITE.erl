@@ -486,7 +486,7 @@ invalid_cash_register_modification(C) ->
         <<"{invalid_shop,{payproc_InvalidShop,<<\"", AnotherShopID/binary, "\">>,{not_exists,<<\"",
             AnotherShopID/binary, "\">>}}}">>,
     {exception, #claim_management_InvalidChangeset{
-        reason = Reason
+        reason_legacy = Reason
     }} = accept_claim(Claim, Client).
 
 -spec shop_contract_modification(config()) -> _.
@@ -536,7 +536,7 @@ contractor_already_exists(C) ->
         <<"{invalid_contractor,{payproc_InvalidContractor,<<\"", ContractorID/binary, "\">>,{already_exists,<<\"",
             ContractorID/binary, "\">>}}}">>,
     {exception, #claim_management_InvalidChangeset{
-        reason = Reason
+        reason_legacy = Reason
     }} = accept_claim(Claim, Client).
 
 -spec contract_already_exists(config()) -> _.
@@ -551,7 +551,7 @@ contract_already_exists(C) ->
         <<"{invalid_contract,{payproc_InvalidContract,<<\"", ContractID/binary, "\">>,{already_exists,<<\"",
             ContractID/binary, "\">>}}}">>,
     {exception, #claim_management_InvalidChangeset{
-        reason = Reason
+        reason_legacy = Reason
     }} = accept_claim(Claim, Client).
 
 -spec contract_already_terminated(config()) -> _.
@@ -567,7 +567,7 @@ contract_already_terminated(C) ->
             "\">>,{invalid_status,{terminated,{domain_ContractTerminated">>,
     ErrorReasonSize = erlang:byte_size(ErrorReason),
     {exception, #claim_management_InvalidChangeset{
-        reason = <<ErrorReason:ErrorReasonSize/binary, _/binary>>
+        reason_legacy = <<ErrorReason:ErrorReasonSize/binary, _/binary>>
     }} = accept_claim(Claim, Client).
 
 -spec shop_already_exists(config()) -> _.
@@ -597,7 +597,7 @@ shop_already_exists(C) ->
         <<"{invalid_shop,{payproc_InvalidShop,<<\"", ShopID/binary, "\">>,{already_exists,<<\"", ShopID/binary,
             "\">>}}}">>,
     {exception, #claim_management_InvalidChangeset{
-        reason = Reason
+        reason_legacy = Reason
     }} = accept_claim(Claim, Client).
 
 %%% Internal functions

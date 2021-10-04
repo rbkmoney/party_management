@@ -205,17 +205,20 @@ handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
         )
     catch
         throw:#payproc_InvalidChangeset{reason = Reason0} ->
-            Reason1 = io_lib:format("~0tp", [Reason0]),
-            Reason2 = unicode:characters_to_binary(Reason1),
-            InvalidModificationChangeset = [
+            ModificationChangeset = [
                 Modification
              || #claim_management_ModificationUnit{
                     modification = Modification
                 } <- Changeset
             ],
+            ReasonLegacy = unicode:characters_to_binary(io_lib:format("~0tp", [Reason0])),
+            % TODO ED-274:  временная функция для возможности работы со старой системой исключений
+            % !!! для конвертации ShopPayoutToolInvalid -> InvalidShopPayoutTool недостаточно данных
+            Reason = map_invalid_changeset_reason(Reason0),
             erlang:throw(#claim_management_InvalidChangeset{
-                reason = Reason2,
-                invalid_changeset = InvalidModificationChangeset
+                reason = {invalid_party_changeset, Reason},
+                invalid_changeset = ModificationChangeset,
+                reason_legacy = ReasonLegacy
             })
     end;
 handle_call('Commit', {_PartyID, CmClaim}, AuxSt, St) ->
@@ -428,6 +431,86 @@ map_error({error, notfound}) ->
     throw(#payproc_PartyNotFound{});
 map_error({error, Reason}) ->
     error(Reason).
+
+map_invalid_changeset_reason({invalid_contract, Reason}) ->
+    {invalid_contract, #claim_management_InvalidContract{
+        id = Reason#payproc_InvalidContract.id,
+        reason = map_invalid_contract_reason(Reason#payproc_InvalidContract.reason)
+    }};
+map_invalid_changeset_reason({invalid_shop, Reason}) ->
+    {invalid_shop, #claim_management_InvalidShop{
+        id = Reason#payproc_InvalidShop.id,
+        reason = map_invalid_shop_reason(Reason#payproc_InvalidShop.reason)
+    }};
+map_invalid_changeset_reason({invalid_wallet, Reason}) ->
+    {invalid_wallet, #claim_management_InvalidWallet{
+        id = Reason#payproc_InvalidWallet.id,
+        reason = map_invalid_wallet_reason(Reason#payproc_InvalidWallet.reason)
+    }};
+map_invalid_changeset_reason({invalid_contractor, Reason}) ->
+    {invalid_contractor, #claim_management_InvalidContractor{
+        id = Reason#payproc_InvalidContractor.id,
+        reason = map_invalid_contractor_reason(Reason#payproc_InvalidContractor.reason)
+    }}.
+
+map_invalid_contract_reason({not_exists, _}) ->
+    {not_exists, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_contract_reason({already_exists, _}) ->
+    {already_exists, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_contract_reason({invalid_object_reference, InvalidObjectReference}) ->
+    {invalid_object_reference, map_invalid_object_reference(InvalidObjectReference)};
+map_invalid_contract_reason({contractor_not_exists, ContractorNotExists}) ->
+    {contractor_not_exists, #claim_management_ContractorNotExists{
+        id = ContractorNotExists#payproc_ContractorNotExists.id
+    }};
+map_invalid_contract_reason(OtherReason) ->
+    OtherReason.
+
+map_invalid_shop_reason({not_exists, _}) ->
+    {not_exists, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_shop_reason({already_exists, _}) ->
+    {already_exists, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_shop_reason({no_account, _}) ->
+    {no_account, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_shop_reason({invalid_status, InvalidStatus}) ->
+    {invalid_status, map_invalid_status(InvalidStatus)};
+map_invalid_shop_reason({contract_terms_violated, ContractTermsViolated}) ->
+    {contract_terms_violated, map_contract_terms_violated(ContractTermsViolated)};
+map_invalid_shop_reason({payout_tool_invalid, _InvalidShopPayoutTool}) ->
+    % TODO ED-274: для конвертации ShopPayoutToolInvalid -> InvalidShopPayoutTool недостаточно данных
+    undefined;
+map_invalid_shop_reason({invalid_object_reference, InvalidObjectReference}) ->
+    {invalid_object_reference, map_invalid_object_reference(InvalidObjectReference)}.
+
+map_invalid_wallet_reason({not_exists, _}) ->
+    {not_exists, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_wallet_reason({already_exists, _}) ->
+    {already_exists, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_wallet_reason({no_account, _}) ->
+    {no_account, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_wallet_reason({invalid_status, InvalidStatus}) ->
+    {invalid_status, map_invalid_status(InvalidStatus)};
+map_invalid_wallet_reason({contract_terms_violated, ContractTermsViolated}) ->
+    {contract_terms_violated, map_contract_terms_violated(ContractTermsViolated)}.
+
+map_invalid_contractor_reason({not_exists, _}) ->
+    {not_exists, #claim_management_InvalidClaimConcreteReason{}};
+map_invalid_contractor_reason({already_exists, _}) ->
+    {already_exists, #claim_management_InvalidClaimConcreteReason{}}.
+
+map_contract_terms_violated(ContractTermsViolated) ->
+    #claim_management_ContractTermsViolated{
+        contract_id = ContractTermsViolated#payproc_ContractTermsViolated.contract_id,
+        terms = ContractTermsViolated#payproc_ContractTermsViolated.terms
+    }.
+
+map_invalid_object_reference(InvalidObjectReference) ->
+    #claim_management_InvalidObjectReference{
+        ref = InvalidObjectReference#payproc_InvalidObjectReference.ref
+    }.
+
+map_invalid_status(Status) ->
+    Status.
 
 -spec get_claim(claim_id(), party_id()) -> claim() | no_return().
 get_claim(ID, PartyID) ->

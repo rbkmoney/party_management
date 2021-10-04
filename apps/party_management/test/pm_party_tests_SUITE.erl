@@ -45,6 +45,7 @@
 
 -export([shop_creation/1]).
 -export([shop_not_found_on_retrieval/1]).
+-export([shop_aggregation/1]).
 -export([shop_terms_retrieval/1]).
 -export([shop_blocking/1]).
 -export([shop_unblocking/1]).
@@ -180,6 +181,7 @@ groups() ->
             contract_creation,
             shop_not_found_on_retrieval,
             shop_creation,
+            shop_aggregation,
             shop_terms_retrieval,
             compute_payout_cash_flow,
             {group, shop_blocking_suspension}
@@ -407,6 +409,8 @@ end_per_testcase(_Name, _C) ->
 -spec party_retrieval(config()) -> _ | no_return().
 
 -spec shop_not_found_on_retrieval(config()) -> _ | no_return().
+-spec shop_creation(config()) -> _ | no_return().
+-spec shop_aggregation(config()) -> _ | no_return().
 -spec shop_terms_retrieval(config()) -> _ | no_return().
 
 -spec party_get_initial_revision(config()) -> _ | no_return().
@@ -779,7 +783,6 @@ shop_not_found_on_retrieval(C) ->
     Client = cfg(client, C),
     ?shop_not_found() = pm_client:get_shop(<<"666">>, Client).
 
--spec shop_creation(config()) -> _.
 shop_creation(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
@@ -819,6 +822,13 @@ shop_creation(C) ->
         payout_tool_id = PayoutToolID1,
         payout_schedule = Schedule
     } = pm_client:get_shop(ShopID, Client).
+
+shop_aggregation(C) ->
+    Client = cfg(client, C),
+    #payproc_ShopContract{
+        shop = #domain_Shop{id = ?REAL_SHOP_ID},
+        contract = #domain_Contract{id = ?REAL_CONTRACT_ID}
+    } = pm_client:get_shop_contract(?REAL_SHOP_ID, Client).
 
 shop_terms_retrieval(C) ->
     Client = cfg(client, C),
