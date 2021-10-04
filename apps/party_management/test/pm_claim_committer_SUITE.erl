@@ -25,6 +25,7 @@
 -export([shop_creation/1]).
 -export([shop_complex_modification/1]).
 -export([invalid_cash_register_modification/1]).
+-export([invalid_category_modification/1]).
 -export([shop_contract_modification/1]).
 -export([contract_termination/1]).
 -export([contractor_already_exists/1]).
@@ -64,6 +65,7 @@ all() ->
         shop_creation,
         shop_complex_modification,
         invalid_cash_register_modification,
+        invalid_category_modification,
         shop_contract_modification,
         contract_termination,
         contractor_already_exists,
@@ -485,6 +487,38 @@ invalid_cash_register_modification(C) ->
     Reason =
         <<"{invalid_shop,{payproc_InvalidShop,<<\"", AnotherShopID/binary, "\">>,{not_exists,<<\"",
             AnotherShopID/binary, "\">>}}}">>,
+    {exception, #claim_management_InvalidChangeset{
+        reason_legacy = Reason
+    }} = accept_claim(Claim, Client).
+
+-spec invalid_category_modification(config()) -> _.
+invalid_category_modification(C) ->
+    Client = cfg(client, C),
+    PartyID = cfg(party_id, C),
+    Modifications = [
+        ?cm_shop_modification(?REAL_SHOP_ID, {category_modification, ?cat(1)})
+    ],
+    Claim = claim(Modifications, PartyID),
+    Reason =
+        <<"{invalid_shop,",
+            "{payproc_InvalidShop,<<\"", ?REAL_SHOP_ID/binary, "\">>,",
+                "{contract_terms_violated,",
+                    "{payproc_ContractTermsViolated,<<\"", ?REAL_CONTRACT_ID1/binary ,"\">>,",
+                        "{domain_TermSet,",
+                            "{domain_PaymentsServiceTerms,",
+                                "undefined,",
+                                "{value,[{domain_CategoryRef,2},{domain_CategoryRef,3}]}",
+                                ",undefined,undefined,undefined,undefined,undefined,undefined",
+                            "},",
+                            "undefined,",
+                            "undefined,",
+                            "undefined,",
+                            "undefined",
+                        "}",
+                    "}",
+                "}",
+            "}",
+        "}">>,
     {exception, #claim_management_InvalidChangeset{
         reason_legacy = Reason
     }} = accept_claim(Claim, Client).

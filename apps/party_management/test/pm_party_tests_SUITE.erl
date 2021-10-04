@@ -856,31 +856,6 @@ shop_terms_retrieval(C) ->
         }
     } = TermSet2.
 
-% shop_update_with_bad_params(C) ->
-%     % FIXME add more invalid params checks
-%     Client = cfg(client, C),
-%     ShopID = <<"SHOP2">>,
-%     ContractID = <<"CONTRACT3">>,
-%     ContractParams = make_contract_params(#domain_ContractTemplateRef{id = 5}),
-%     PayoutToolParams = pm_ct_helper:make_battle_ready_payout_tool_params(),
-%     Changeset = [
-%         ?contract_modification(ContractID, {creation, ContractParams}),
-%         ?contract_modification(ContractID, ?payout_tool_creation(<<"1">>, PayoutToolParams))
-%     ],
-%     Claim = assert_claim_pending(pm_client:create_claim(Changeset, Client), Client),
-%     ok = accept_claim(Claim, Client),
-
-%     Claim1 =
-%         #payproc_Claim{id = ID1, revision = Rev1} = assert_claim_pending(
-%             pm_client:create_claim(
-%                 [?shop_modification(ShopID, {category_modification, ?cat(1)})],
-%                 Client
-%             ),
-%             Client
-%         ),
-%     ?invalid_changeset(_CategoryError) = pm_client:accept_claim(ID1, Rev1, Client),
-%     ok = revoke_claim(Claim1, Client).
-
 claim_not_found_on_retrieval(C) ->
     Client = cfg(client, C),
     ?claim_not_found() = pm_client:get_claim(-666, Client).
