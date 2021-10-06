@@ -36,14 +36,19 @@ from_claim_mgmt(#claim_management_Claim{
 
 -spec assert_cash_register_modifications_applicable(changeset(), party()) -> ok | no_return().
 assert_cash_register_modifications_applicable(Changeset, Party) ->
-    CashRegisterShopIDs = get_cash_register_modifications_shop_ids(Changeset),
+    MappedChanges = get_cash_register_modifications_map(Changeset),
+    CashRegisterShopIDs = maps:keys(MappedChanges),
     ShopIDs = get_all_valid_shop_ids(Changeset, Party),
     case sets:is_subset(CashRegisterShopIDs, ShopIDs) of
         true ->
             ok;
         false ->
             ShopID = hd(sets:to_list(sets:subtract(CashRegisterShopIDs, ShopIDs))),
-            throw(#payproc_InvalidChangeset{reason = ?invalid_shop(ShopID, {not_exists, ShopID})})
+            InvalidChangeset = maps:get(ShopID, MappedChanges),
+            throw(#claim_management_InvalidChangeset{
+                reason = ?cm_invalid_shop(ShopID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}),
+                invalid_changeset = [InvalidChangeset]
+            })
     end.
 
 %%% Internal functions
@@ -163,21 +168,16 @@ get_all_valid_shop_ids(Changeset, Party) ->
 get_party_shop_ids(Party) ->
     sets:from_list(maps:keys(pm_party:get_shops(Party))).
 
-get_cash_register_modifications_shop_ids(Changeset) ->
-    sets:from_list(
-        lists:filtermap(
-            fun
-                (
-                    #claim_management_ModificationUnit{
-                        modification = {party_modification, ?cm_cash_register_modification_unit_modification(ShopID, _)}
-                    }
-                ) ->
-                    {true, ShopID};
-                (_) ->
-                    false
-            end,
-            Changeset
-        )
+get_cash_register_modifications_map(Changeset) ->
+    lists:foldl(
+        fun
+            (C = #claim_management_ModificationUnit{modification = {party_modification, ?cm_cash_register_modification_unit_modification(ShopID, _)}}, Acc) ->
+                Acc#{ShopID => C };
+            (_, Acc) ->
+                Acc
+        end,
+        #{},
+        Changeset
     ).
 
 get_shop_modifications_shop_ids(Changeset) ->
