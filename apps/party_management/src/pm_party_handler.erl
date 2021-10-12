@@ -81,7 +81,8 @@ handle_function_('ComputeShopTerms', {UserInfo, PartyID, ShopID, Timestamp, Part
     Shop = ensure_shop(pm_party:get_shop(ShopID, Party)),
     Contract = pm_party:get_contract(Shop#domain_Shop.contract_id, Party),
     Revision = pm_domain:head(),
-    DecodedVS = pm_varset:decode_varset(Varset),
+    NewVarset = Varset#{identification_level => get_identification_level(Contract, Party)},
+    DecodedVS = pm_varset:decode_varset(NewVarset),
     pm_party:reduce_terms(pm_party:get_terms(Contract, Timestamp, Revision), DecodedVS, Revision);
 handle_function_(Fun, Args, _Opts) when
     Fun =:= 'BlockShop' orelse
