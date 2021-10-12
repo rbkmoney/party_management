@@ -74,7 +74,8 @@ handle_function_('GetShopContract', {UserInfo, PartyID, ID}, _Opts) ->
     Party = pm_party_machine:get_party(PartyID),
     Shop = ensure_shop(pm_party:get_shop(ID, Party)),
     Contract = pm_party:get_contract(Shop#domain_Shop.contract_id, Party),
-    #payproc_ShopContract{shop = Shop, contract = Contract};
+    Contractor = pm_party:get_contractor(Contract#domain_Contract.contractor_id, Party),
+    #payproc_ShopContract{shop = Shop, contract = Contract, contractor = Contractor};
 handle_function_('ComputeShopTerms', {UserInfo, PartyID, ShopID, Timestamp, PartyRevision, Varset}, _Opts) ->
     ok = set_meta_and_check_access(UserInfo, PartyID),
     Party = checkout_party(PartyID, PartyRevision),
