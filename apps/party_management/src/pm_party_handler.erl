@@ -114,17 +114,6 @@ handle_function_('GetClaim', {UserInfo, PartyID, ID}, _Opts) ->
 handle_function_('GetClaims', {UserInfo, PartyID}, _Opts) ->
     ok = set_meta_and_check_access(UserInfo, PartyID),
     pm_party_machine:get_claims(PartyID);
-handle_function_(Fun, Args, _Opts) when
-    Fun =:= 'CreateClaim' orelse
-        Fun =:= 'AcceptClaim' orelse
-        Fun =:= 'UpdateClaim' orelse
-        Fun =:= 'DenyClaim' orelse
-        Fun =:= 'RevokeClaim'
-->
-    UserInfo = erlang:element(1, Args),
-    PartyID = erlang:element(2, Args),
-    ok = set_meta_and_check_access(UserInfo, PartyID),
-    call(PartyID, Fun, Args);
 %% Event
 
 handle_function_('GetEvents', {UserInfo, PartyID, Range}, _Opts) ->

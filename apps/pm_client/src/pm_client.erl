@@ -1,26 +1,29 @@
--module(pm_client_party).
+-module(pm_client).
 
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
+-include_lib("damsel/include/dmsl_claim_management_thrift.hrl").
 
 -export([start/2]).
 -export([start/3]).
 -export([start_link/2]).
 -export([stop/1]).
 
--export([create/2]).
--export([get/1]).
--export([get_revision/1]).
--export([checkout/2]).
--export([block/2]).
--export([unblock/2]).
--export([suspend/1]).
--export([activate/1]).
--export([get_status/1]).
+%% Party Management API
 
--export([get_meta/1]).
--export([get_metadata/2]).
--export([set_metadata/3]).
--export([remove_metadata/2]).
+-export([create_party/2]).
+-export([get_party/1]).
+-export([get_party_revision/1]).
+-export([checkout_party/2]).
+-export([block_party/2]).
+-export([unblock_party/2]).
+-export([suspend_party/1]).
+-export([activate_party/1]).
+-export([get_party_status/1]).
+
+-export([get_party_meta/1]).
+-export([get_party_metadata/2]).
+-export([set_party_metadata/3]).
+-export([remove_party_metadata/2]).
 
 -export([get_contract/2]).
 -export([compute_contract_terms/6]).
@@ -37,11 +40,6 @@
 
 -export([get_claim/2]).
 -export([get_claims/1]).
--export([create_claim/2]).
--export([update_claim/4]).
--export([accept_claim/3]).
--export([deny_claim/4]).
--export([revoke_claim/4]).
 
 -export([get_account_state/2]).
 -export([get_shop_account/2]).
@@ -52,6 +50,11 @@
 -export([compute_provider_terminal_terms/5]).
 -export([compute_globals/3]).
 -export([compute_routing_ruleset/4]).
+
+%% Claim Committer API
+
+-export([accept_claim/2]).
+-export([commit_claim/2]).
 
 %% GenServer
 
@@ -74,8 +77,6 @@
 -type shop_id() :: dmsl_domain_thrift:'ShopID'().
 -type claim_id() :: dmsl_payment_processing_thrift:'ClaimID'().
 -type claim() :: dmsl_payment_processing_thrift:'Claim'().
--type claim_revision() :: dmsl_payment_processing_thrift:'ClaimRevision'().
--type changeset() :: dmsl_payment_processing_thrift:'PartyChangeset'().
 -type shop_account_id() :: dmsl_domain_thrift:'AccountID'().
 -type meta() :: dmsl_domain_thrift:'PartyMeta'().
 -type meta_ns() :: dmsl_domain_thrift:'PartyMetaNamespace'().
@@ -89,6 +90,8 @@
 -type provider_ref() :: dmsl_domain_thrift:'ProviderRef'().
 -type terminal_ref() :: dmsl_domain_thrift:'TerminalRef'().
 -type routing_ruleset_ref() :: dmsl_domain_thrift:'RoutingRulesetRef'().
+
+-type cm_claim() :: dmsl_claim_management_thrift:'Claim'().
 
 -spec start(party_id(), pm_client_api:t()) -> pid().
 start(PartyID, ApiClient) ->
@@ -113,56 +116,56 @@ stop(Client) ->
 
 %%
 
--spec create(party_params(), pid()) -> ok | woody_error:business_error().
-create(PartyParams, Client) ->
+-spec create_party(party_params(), pid()) -> ok | woody_error:business_error().
+create_party(PartyParams, Client) ->
     map_result_error(gen_server:call(Client, {call, 'Create', [PartyParams]})).
 
--spec get(pid()) -> dmsl_domain_thrift:'Party'() | woody_error:business_error().
-get(Client) ->
+-spec get_party(pid()) -> dmsl_domain_thrift:'Party'() | woody_error:business_error().
+get_party(Client) ->
     map_result_error(gen_server:call(Client, {call, 'Get', []})).
 
--spec get_revision(pid()) -> dmsl_domain_thrift:'Party'() | woody_error:business_error().
-get_revision(Client) ->
+-spec get_party_revision(pid()) -> dmsl_domain_thrift:'Party'() | woody_error:business_error().
+get_party_revision(Client) ->
     map_result_error(gen_server:call(Client, {call, 'GetRevision', []})).
 
--spec get_status(pid()) -> dmsl_domain_thrift:'PartyStatus'() | woody_error:business_error().
-get_status(Client) ->
+-spec get_party_status(pid()) -> dmsl_domain_thrift:'PartyStatus'() | woody_error:business_error().
+get_party_status(Client) ->
     map_result_error(gen_server:call(Client, {call, 'GetStatus', []})).
 
--spec checkout(party_revision_param(), pid()) -> dmsl_domain_thrift:'Party'() | woody_error:business_error().
-checkout(PartyRevisionParam, Client) ->
+-spec checkout_party(party_revision_param(), pid()) -> dmsl_domain_thrift:'Party'() | woody_error:business_error().
+checkout_party(PartyRevisionParam, Client) ->
     map_result_error(gen_server:call(Client, {call, 'Checkout', [PartyRevisionParam]})).
 
--spec block(binary(), pid()) -> ok | woody_error:business_error().
-block(Reason, Client) ->
+-spec block_party(binary(), pid()) -> ok | woody_error:business_error().
+block_party(Reason, Client) ->
     map_result_error(gen_server:call(Client, {call, 'Block', [Reason]})).
 
--spec unblock(binary(), pid()) -> ok | woody_error:business_error().
-unblock(Reason, Client) ->
+-spec unblock_party(binary(), pid()) -> ok | woody_error:business_error().
+unblock_party(Reason, Client) ->
     map_result_error(gen_server:call(Client, {call, 'Unblock', [Reason]})).
 
--spec suspend(pid()) -> ok | woody_error:business_error().
-suspend(Client) ->
+-spec suspend_party(pid()) -> ok | woody_error:business_error().
+suspend_party(Client) ->
     map_result_error(gen_server:call(Client, {call, 'Suspend', []})).
 
--spec activate(pid()) -> ok | woody_error:business_error().
-activate(Client) ->
+-spec activate_party(pid()) -> ok | woody_error:business_error().
+activate_party(Client) ->
     map_result_error(gen_server:call(Client, {call, 'Activate', []})).
 
--spec get_meta(pid()) -> meta() | woody_error:business_error().
-get_meta(Client) ->
+-spec get_party_meta(pid()) -> meta() | woody_error:business_error().
+get_party_meta(Client) ->
     map_result_error(gen_server:call(Client, {call, 'GetMeta', []})).
 
--spec get_metadata(meta_ns(), pid()) -> meta_data() | woody_error:business_error().
-get_metadata(NS, Client) ->
+-spec get_party_metadata(meta_ns(), pid()) -> meta_data() | woody_error:business_error().
+get_party_metadata(NS, Client) ->
     map_result_error(gen_server:call(Client, {call, 'GetMetaData', [NS]})).
 
--spec set_metadata(meta_ns(), meta_data(), pid()) -> ok | woody_error:business_error().
-set_metadata(NS, Data, Client) ->
+-spec set_party_metadata(meta_ns(), meta_data(), pid()) -> ok | woody_error:business_error().
+set_party_metadata(NS, Data, Client) ->
     map_result_error(gen_server:call(Client, {call, 'SetMetaData', [NS, Data]})).
 
--spec remove_metadata(meta_ns(), pid()) -> ok | woody_error:business_error().
-remove_metadata(NS, Client) ->
+-spec remove_party_metadata(meta_ns(), pid()) -> ok | woody_error:business_error().
+remove_party_metadata(NS, Client) ->
     map_result_error(gen_server:call(Client, {call, 'RemoveMetaData', [NS]})).
 
 -spec get_contract(contract_id(), pid()) -> dmsl_domain_thrift:'Contract'() | woody_error:business_error().
@@ -223,26 +226,6 @@ get_claim(ID, Client) ->
 get_claims(Client) ->
     map_result_error(gen_server:call(Client, {call, 'GetClaims', []})).
 
--spec create_claim(changeset(), pid()) -> claim() | woody_error:business_error().
-create_claim(Changeset, Client) ->
-    map_result_error(gen_server:call(Client, {call, 'CreateClaim', [Changeset]})).
-
--spec update_claim(claim_id(), claim_revision(), changeset(), pid()) -> ok | woody_error:business_error().
-update_claim(ID, Revision, Changeset, Client) ->
-    map_result_error(gen_server:call(Client, {call, 'UpdateClaim', [ID, Revision, Changeset]})).
-
--spec accept_claim(claim_id(), claim_revision(), pid()) -> ok | woody_error:business_error().
-accept_claim(ID, Revision, Client) ->
-    map_result_error(gen_server:call(Client, {call, 'AcceptClaim', [ID, Revision]})).
-
--spec deny_claim(claim_id(), claim_revision(), binary() | undefined, pid()) -> ok | woody_error:business_error().
-deny_claim(ID, Revision, Reason, Client) ->
-    map_result_error(gen_server:call(Client, {call, 'DenyClaim', [ID, Revision, Reason]})).
-
--spec revoke_claim(claim_id(), claim_revision(), binary() | undefined, pid()) -> ok | woody_error:business_error().
-revoke_claim(ID, Revision, Reason, Client) ->
-    map_result_error(gen_server:call(Client, {call, 'RevokeClaim', [ID, Revision, Reason]})).
-
 -spec get_account_state(shop_account_id(), pid()) ->
     dmsl_payment_processing_thrift:'AccountState'() | woody_error:business_error().
 get_account_state(AccountID, Client) ->
@@ -286,6 +269,18 @@ compute_routing_ruleset(RoutingRuleSetRef, Revision, Varset, Client) ->
             {call_without_party, 'ComputeRoutingRuleset', [RoutingRuleSetRef, Revision, Varset]}
         )
     ).
+
+%%
+
+-spec accept_claim(cm_claim(), pid()) -> ok | woody_error:business_error().
+accept_claim(Claim, Client) ->
+    map_result_error(gen_server:call(Client, {call_claim_committer, 'Accept', [Claim]})).
+
+-spec commit_claim(cm_claim(), pid()) -> ok | woody_error:business_error().
+commit_claim(Claim, Client) ->
+    map_result_error(gen_server:call(Client, {call_claim_committer, 'Commit', [Claim]})).
+
+%%
 
 -define(DEFAULT_NEXT_EVENT_TIMEOUT, 5000).
 
@@ -338,6 +333,9 @@ handle_call({call, Function, Args0}, _From, St = #state{client = Client}) ->
 handle_call({call_without_party, Function, Args0}, _From, St = #state{client = Client}) ->
     Args = [St#state.user_info | Args0],
     Result = pm_client_api:call(party_management, Function, Args, Client),
+    {reply, Result, St};
+handle_call({call_claim_committer, Function, Args}, _From, St = #state{client = Client}) ->
+    Result = pm_client_api:call(claim_committer, Function, [St#state.party_id | Args], Client),
     {reply, Result, St};
 handle_call({pull_event, Timeout}, _From, St = #state{poller = Poller, client = Client}) ->
     {Result, PollerNext} = pm_client_event_poller:poll(1, Timeout, Client, Poller),

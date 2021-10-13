@@ -5,11 +5,7 @@
 -include_lib("damsel/include/dmsl_domain_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 
--export([create/5]).
--export([update/5]).
 -export([accept/4]).
--export([deny/3]).
--export([revoke/3]).
 -export([apply/3]).
 
 -export([get_id/1]).
@@ -51,23 +47,6 @@ get_id(#payproc_Claim{id = ID}) ->
 get_revision(#payproc_Claim{revision = Revision}) ->
     Revision.
 
--spec create(claim_id(), changeset(), party(), timestamp(), revision()) -> claim() | no_return().
-create(ID, Changeset, Party, Timestamp, Revision) ->
-    ok = assert_changeset_applicable(Changeset, Timestamp, Revision, Party),
-    #payproc_Claim{
-        id = ID,
-        status = ?pending(),
-        changeset = Changeset,
-        revision = 1,
-        created_at = Timestamp
-    }.
-
--spec update(changeset(), claim(), party(), timestamp(), revision()) -> claim() | no_return().
-update(NewChangeset, #payproc_Claim{changeset = OldChangeset} = Claim, Party, Timestamp, Revision) ->
-    TmpChangeset = merge_changesets(OldChangeset, NewChangeset),
-    ok = assert_changeset_applicable(TmpChangeset, Timestamp, Revision, Party),
-    update_changeset(NewChangeset, get_next_revision(Claim), Timestamp, Claim).
-
 -spec update_changeset(changeset(), claim_revision(), timestamp(), claim()) -> claim().
 update_changeset(NewChangeset, NewRevision, Timestamp, #payproc_Claim{changeset = OldChangeset} = Claim) ->
     Claim#payproc_Claim{
@@ -81,15 +60,6 @@ accept(Timestamp, DomainRevision, Party, Claim) ->
     ok = assert_acceptable(Claim, Timestamp, DomainRevision, Party),
     Effects = make_effects(Timestamp, DomainRevision, Claim),
     set_status(?accepted(Effects), get_next_revision(Claim), Timestamp, Claim).
-
--spec deny(binary(), timestamp(), claim()) -> claim().
-deny(Reason, Timestamp, Claim) ->
-    set_status(?denied(Reason), get_next_revision(Claim), Timestamp, Claim).
-
--spec revoke(binary(), timestamp(), claim()) -> claim().
-revoke(Reason, Timestamp, Claim) ->
-    set_status(?revoked(Reason), get_next_revision(Claim), Timestamp, Claim).
-
 -spec set_status(claim_status(), claim_revision(), timestamp(), claim()) -> claim().
 set_status(Status, NewRevision, Timestamp, Claim) ->
     Claim#payproc_Claim{
@@ -133,7 +103,6 @@ get_changeset(#payproc_Claim{changeset = Changeset}) ->
 
 get_next_revision(#payproc_Claim{revision = ClaimRevision}) ->
     ClaimRevision + 1.
-
 is_changeset_need_acceptance(Changeset, Party, Revision) ->
     lists:any(fun(Change) -> is_change_need_acceptance(Change, Party, Revision) end, Changeset).
 
