@@ -146,4 +146,8 @@
     )
 ).
 
+-define(cm_invalid_shop(ID, Reason),
+    {invalid_shop, #claim_management_InvalidShop{id = ID, reason = Reason}}
+).
+
 -endif.
