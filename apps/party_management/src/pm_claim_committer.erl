@@ -7,7 +7,7 @@
 -include("party_events.hrl").
 
 -export([from_claim_mgmt/1]).
--export([assert_cash_regisrter_modifications_applicable/2]).
+-export([assert_cash_register_modifications_applicable/2]).
 -export([assert_applicable/4]).
 -export([assert_acceptable/4]).
 
