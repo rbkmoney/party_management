@@ -349,17 +349,11 @@ invalid_cash_register_modification(C) ->
         description = <<"Updated shop description.">>
     },
     AnotherShopID = <<"Totaly not the valid one">>,
-    Modifications = [
-        ?cm_shop_modification(?REAL_SHOP_ID, {details_modification, NewDetails}),
-        ?cm_shop_modification(AnotherShopID, {cash_register_modification_unit, CashRegisterModificationUnit})
-    ],
+    Mod = ?cm_shop_modification(AnotherShopID, {cash_register_modification_unit, CashRegisterModificationUnit}),
+    Modifications = [?cm_shop_modification(?REAL_SHOP_ID, {details_modification, NewDetails}), Mod],
     Claim = claim(Modifications, PartyID),
-    Reason =
-        <<"{invalid_shop,{payproc_InvalidShop,<<\"", AnotherShopID/binary, "\">>,{not_exists,<<\"",
-            AnotherShopID/binary, "\">>}}}">>,
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = Reason
-    }} = accept_claim(Claim, C).
+    {exception, ?cm_invalid_party_changeset(?cm_invalid_shop_not_exists(AnotherShopID), [{party_modification, Mod}])} =
+        accept_claim(Claim, C).
 
 -spec shop_contract_modification(config()) -> _.
 shop_contract_modification(C) ->

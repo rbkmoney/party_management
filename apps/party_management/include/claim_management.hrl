@@ -150,4 +150,12 @@
     {invalid_shop, #claim_management_InvalidShop{id = ID, reason = Reason}}
 ).
 
+-define(cm_invalid_shop_not_exists(ID),
+    ?cm_invalid_shop(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
+-define(cm_invalid_party_changeset(Reason, InvalidChangeset), #claim_management_InvalidChangeset{
+    reason = {invalid_party_changeset, Reason},
+    invalid_changeset = InvalidChangeset
+}).
 -endif.

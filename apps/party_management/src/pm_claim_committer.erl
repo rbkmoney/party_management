@@ -42,7 +42,7 @@ from_claim_mgmt(#claim_management_Claim{
 -spec assert_cash_register_modifications_applicable(changeset(), party()) -> ok | no_return().
 assert_cash_register_modifications_applicable(Changeset, Party) ->
     MappedChanges = get_cash_register_modifications_map(Changeset),
-    CashRegisterShopIDs = maps:keys(MappedChanges),
+    CashRegisterShopIDs = sets:from_list(maps:keys(MappedChanges)),
     ShopIDs = get_all_valid_shop_ids(Changeset, Party),
     case sets:is_subset(CashRegisterShopIDs, ShopIDs) of
         true ->
@@ -50,10 +50,7 @@ assert_cash_register_modifications_applicable(Changeset, Party) ->
         false ->
             ShopID = hd(sets:to_list(sets:subtract(CashRegisterShopIDs, ShopIDs))),
             InvalidChangeset = maps:get(ShopID, MappedChanges),
-            throw(#claim_management_InvalidChangeset{
-                reason = ?cm_invalid_shop(ShopID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}),
-                invalid_changeset = [InvalidChangeset]
-            })
+            throw(?cm_invalid_party_changeset(?cm_invalid_shop_not_exists(ShopID), [InvalidChangeset]))
     end.
 
 %%% Internal functions
@@ -176,8 +173,13 @@ get_party_shop_ids(Party) ->
 get_cash_register_modifications_map(Changeset) ->
     lists:foldl(
         fun
-            (C = #claim_management_ModificationUnit{modification = {party_modification, ?cm_cash_register_modification_unit_modification(ShopID, _)}}, Acc) ->
-                Acc#{ShopID => C };
+            (
+                #claim_management_ModificationUnit{
+                    modification = C = {party_modification, ?cm_cash_register_modification_unit_modification(ShopID, _)}
+                },
+                Acc
+            ) ->
+                Acc#{ShopID => C};
             (_, Acc) ->
                 Acc
         end,
