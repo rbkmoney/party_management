@@ -15,7 +15,6 @@
     payment_method => dmsl_domain_thrift:'PaymentMethodRef'(),
     payout_method => dmsl_domain_thrift:'PayoutMethodRef'(),
     wallet_id => dmsl_domain_thrift:'WalletID'(),
-    p2p_tool => dmsl_domain_thrift:'P2PTool'(),
     shop_id => dmsl_domain_thrift:'ShopID'(),
     identification_level => dmsl_domain_thrift:'ContractorIdentificationLevel'(),
     payment_tool => dmsl_domain_thrift:'PaymentTool'(),
@@ -33,7 +32,6 @@ encode_varset(Varset) ->
         payment_method = genlib_map:get(payment_method, Varset),
         payout_method = genlib_map:get(payout_method, Varset),
         wallet_id = genlib_map:get(wallet_id, Varset),
-        p2p_tool = genlib_map:get(p2p_tool, Varset),
         shop_id = genlib_map:get(shop_id, Varset),
         identification_level = genlib_map:get(identification_level, Varset),
         payment_tool = genlib_map:get(payment_tool, Varset),
@@ -53,7 +51,6 @@ decode_varset(Varset, VS) ->
         payment_method => Varset#payproc_Varset.payment_method,
         payout_method => Varset#payproc_Varset.payout_method,
         wallet_id => Varset#payproc_Varset.wallet_id,
-        p2p_tool => Varset#payproc_Varset.p2p_tool,
         shop_id => Varset#payproc_Varset.shop_id,
         identification_level => Varset#payproc_Varset.identification_level,
         payment_tool => prepare_payment_tool_var(
@@ -88,18 +85,6 @@ encode_decode_test() ->
         payment_method => #domain_PaymentMethodRef{id = {bank_card_deprecated, visa}},
         payout_method => #domain_PayoutMethodRef{id = any},
         wallet_id => <<"wallet_id">>,
-        p2p_tool => #domain_P2PTool{
-            sender =
-                {digital_wallet, #domain_DigitalWallet{
-                    provider_deprecated = qiwi,
-                    id = <<"digital_wallet_id">>
-                }},
-            receiver =
-                {digital_wallet, #domain_DigitalWallet{
-                    provider_deprecated = qiwi,
-                    id = <<"digital_wallet_id">>
-                }}
-        },
         shop_id => <<"shop_id">>,
         identification_level => full,
         payment_tool =>

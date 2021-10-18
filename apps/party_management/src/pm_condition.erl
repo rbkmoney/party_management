@@ -39,8 +39,6 @@ test({payout_method_is, V1}, #{payout_method := V2}, _) ->
     V1 =:= V2;
 test({identification_level_is, V1}, #{identification_level := V2}, _) ->
     V1 =:= V2;
-test({p2p_tool, #domain_P2PToolCondition{} = C}, #{p2p_tool := #domain_P2PTool{} = V}, Rev) ->
-    test_p2p_tool(C, V, Rev);
 test({bin_data, #domain_BinDataCondition{} = C}, #{bin_data := #domain_BinData{} = V}, Rev) ->
     test_bindata_tool(C, V, Rev);
 test(_, #{}, _) ->
@@ -61,26 +59,6 @@ test_party_definition({contract_is, ID1}, #{contract_id := ID2}) ->
     ID1 =:= ID2;
 test_party_definition(_, _) ->
     undefined.
-
-test_p2p_tool(P2PCondition, P2PTool, Rev) ->
-    #domain_P2PToolCondition{
-        sender_is = SenderIs,
-        receiver_is = ReceiverIs
-    } = P2PCondition,
-    #domain_P2PTool{
-        sender = Sender,
-        receiver = Receiver
-    } = P2PTool,
-    ternary_and([
-        ternary_or([
-            SenderIs == undefined,
-            fun() -> test({payment_tool, SenderIs}, #{payment_tool => Sender}, Rev) end
-        ]),
-        ternary_or([
-            ReceiverIs == undefined,
-            fun() -> test({payment_tool, ReceiverIs}, #{payment_tool => Receiver}, Rev) end
-        ])
-    ]).
 
 test_bindata_tool(
     #domain_BinDataCondition{

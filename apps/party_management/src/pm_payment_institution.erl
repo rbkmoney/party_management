@@ -52,16 +52,6 @@ reduce_payment_institution(PaymentInstitution, VS, Revision) ->
             VS,
             Revision
         ),
-        p2p_providers = reduce_if_defined(
-            PaymentInstitution#domain_PaymentInstitution.p2p_providers,
-            VS,
-            Revision
-        ),
-        p2p_inspector = reduce_if_defined(
-            PaymentInstitution#domain_PaymentInstitution.p2p_inspector,
-            VS,
-            Revision
-        ),
         providers = reduce_if_defined(
             PaymentInstitution#domain_PaymentInstitution.providers,
             VS,
