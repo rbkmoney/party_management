@@ -9,6 +9,7 @@
 -export([from_claim_mgmt/1]).
 -export([assert_cash_register_modifications_applicable/2]).
 -export([assert_applicable/4]).
+-export([assert_changeset_applicable/4]).
 -export([assert_acceptable/4]).
 
 -type party() :: pm_party:party().
@@ -220,16 +221,16 @@ get_changeset(#payproc_Claim{changeset = Changeset}) ->
 -spec assert_changeset_applicable(changeset(), timestamp(), revision(), party()) -> ok | no_return().
 assert_changeset_applicable([Change | Others], Timestamp, Revision, Party) ->
     case Change of
-        ?contract_modification(ID, Modification) ->
+        ?cm_contract_modification(ID, Modification) ->
             Contract = pm_party:get_contract(ID, Party),
             ok = assert_contract_change_applicable(ID, Modification, Contract);
-        ?shop_modification(ID, Modification) ->
+        ?cm_shop_modification(ID, Modification) ->
             Shop = pm_party:get_shop(ID, Party),
             ok = assert_shop_change_applicable(ID, Modification, Shop, Party, Revision);
-        ?contractor_modification(ID, Modification) ->
+        ?cm_contractor_modification(ID, Modification) ->
             Contractor = pm_party:get_contractor(ID, Party),
             ok = assert_contractor_change_applicable(ID, Modification, Contractor);
-        ?wallet_modification(ID, Modification) ->
+        ?cm_wallet_modification(ID, Modification) ->
             Wallet = pm_party:get_wallet(ID, Party),
             ok = assert_wallet_change_applicable(ID, Modification, Wallet)
     end,
@@ -329,34 +330,34 @@ update_wallet({account_created, Account}, Wallet) ->
 assert_contract_change_applicable(_, {creation, _}, undefined) ->
     ok;
 assert_contract_change_applicable(ID, {creation, _}, #domain_Contract{}) ->
-    raise_invalid_changeset(?invalid_contract(ID, {already_exists, ID}));
+    raise_invalid_changeset(?cm_invalid_contract(ID, {already_exists, ID}));
 assert_contract_change_applicable(ID, _AnyModification, undefined) ->
-    raise_invalid_changeset(?invalid_contract(ID, {not_exists, ID}));
-assert_contract_change_applicable(ID, ?contract_termination(_), Contract) ->
+    raise_invalid_changeset(?cm_invalid_contract(ID, {not_exists, ID}));
+assert_contract_change_applicable(ID, ?cm_contract_termination(_), Contract) ->
     case pm_contract:is_active(Contract) of
         true ->
             ok;
         false ->
-            raise_invalid_changeset(?invalid_contract(ID, {invalid_status, Contract#domain_Contract.status}))
+            raise_invalid_changeset(?cm_invalid_contract(ID, {invalid_status, Contract#domain_Contract.status}))
     end;
-assert_contract_change_applicable(ID, ?adjustment_creation(AdjustmentID, _), Contract) ->
+assert_contract_change_applicable(ID, ?cm_adjustment_creation(AdjustmentID, _), Contract) ->
     case pm_contract:get_adjustment(AdjustmentID, Contract) of
         undefined ->
             ok;
         _ ->
-            raise_invalid_changeset(?invalid_contract(ID, {contract_adjustment_already_exists, AdjustmentID}))
+            raise_invalid_changeset(?cm_invalid_contract(ID, {contract_adjustment_already_exists, AdjustmentID}))
     end;
-assert_contract_change_applicable(ID, ?payout_tool_creation(PayoutToolID, _), Contract) ->
+assert_contract_change_applicable(ID, ?cm_payout_tool_creation(PayoutToolID, _), Contract) ->
     case pm_contract:get_payout_tool(PayoutToolID, Contract) of
         undefined ->
             ok;
         _ ->
-            raise_invalid_changeset(?invalid_contract(ID, {payout_tool_already_exists, PayoutToolID}))
+            raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_already_exists, PayoutToolID}))
     end;
-assert_contract_change_applicable(ID, ?payout_tool_info_modification(PayoutToolID, _), Contract) ->
+assert_contract_change_applicable(ID, ?cm_payout_tool_info_modification(PayoutToolID, _), Contract) ->
     case pm_contract:get_payout_tool(PayoutToolID, Contract) of
         undefined ->
-            raise_invalid_changeset(?invalid_contract(ID, {payout_tool_not_exists, PayoutToolID}));
+            raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_not_exists, PayoutToolID}));
         _ ->
             ok
     end;

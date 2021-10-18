@@ -252,7 +252,7 @@ handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
                 Timestamp = pm_datetime:format_now(),
                 Revision = pm_domain:head(),
 
-                ok = pm_claim_committer:assert_applicable(PayprocClaim, Timestamp, Revision, Party),
+                ok = pm_claim_committer:assert_changeset_applicable(Changeset, Timestamp, Revision, Party),
                 ok = pm_claim_committer:assert_acceptable(PayprocClaim, Timestamp, Revision, Party)
         end,
         respond(

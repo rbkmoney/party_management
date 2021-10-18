@@ -146,6 +146,19 @@
     )
 ).
 
+%%% Wallet
+-define(cm_wallet_modification(ID, Modification),
+    {wallet_modification, #claim_management_WalletModificationUnit{id = ID, modification = Modification}}
+).
+
+
+%%% Error
+
+-define(cm_invalid_party_changeset(Reason, InvalidChangeset), #claim_management_InvalidChangeset{
+    reason = {invalid_party_changeset, Reason},
+    invalid_changeset = InvalidChangeset
+}).
+
 -define(cm_invalid_shop(ID, Reason),
     {invalid_shop, #claim_management_InvalidShop{id = ID, reason = Reason}}
 ).
@@ -154,8 +167,17 @@
     ?cm_invalid_shop(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}})
 ).
 
--define(cm_invalid_party_changeset(Reason, InvalidChangeset), #claim_management_InvalidChangeset{
-    reason = {invalid_party_changeset, Reason},
-    invalid_changeset = InvalidChangeset
-}).
+
+-define(cm_invalid_contract(ID, Reason),
+    {invalid_contract, #claim_management_InvalidContract{id = ID, reason = Reason}}
+).
+
+-define(cm_invalid_contractor(ID, Reason),
+    {invalid_contractor, #claim_management_InvalidContractor{id = ID, reason = Reason}}
+).
+
+-define(cm_invalid_wallet(ID, Reason),
+    {invalid_wallet, #claim_management_InvalidWallet{id = ID, reason = Reason}}
+).
+
 -endif.
