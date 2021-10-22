@@ -61,22 +61,11 @@ to_party_status(?cm_pending_acceptance()) ->
 to_party_changeset(Changeset) ->
     lists:filtermap(
         fun
-            (
-                #claim_management_ModificationUnit{
-                    modification = {party_modification, PartyMod}
-                }
-            ) ->
-                case PartyMod of
-                    ?cm_shop_cash_register_modification_unit(_, _) ->
-                        false;
-                    PartyMod ->
-                        {true, to_payproc_party_modification(PartyMod)}
-                end;
-            (
-                #claim_management_ModificationUnit{
-                    modification = {claim_modification, _}
-                }
-            ) ->
+            (?cm_party_modification(_, _, ?cm_shop_cash_register_modification_unit(_, _), _)) ->
+                false;
+            (?cm_party_modification(_, _, PartyMod, _)) ->
+                {true, to_payproc_party_modification(PartyMod)};
+            (?cm_modification_unit(_, _, _, _)) ->
                 false
         end,
         Changeset

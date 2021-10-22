@@ -23,9 +23,12 @@
 filter_party_changes(Changeset) ->
     lists:filtermap(
         fun
-            (?cm_party_modification(_, _, ?cm_shop_cash_register_modification_unit(_, _), _)) -> false;
-            (?cm_party_modification(_, _, _, _)) -> true;
-            (_) -> false
+            (?cm_party_modification(_, _, ?cm_shop_cash_register_modification_unit(_, _), _)) ->
+                false;
+            (?cm_party_modification(_, _, _, _)) ->
+                true;
+            (?cm_modification_unit(_, _, _, _)) ->
+                false
         end,
         Changeset
     ).

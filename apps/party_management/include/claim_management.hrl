@@ -14,6 +14,10 @@
     ?cm_modification_unit(ModID, Timestamp, {party_modification, Mod}, UserInfo)
 ).
 
+-define(cm_claim_modification(ModID, Timestamp, Mod, UserInfo),
+    ?cm_modification_unit(ModID, Timestamp, {claim_modification, Mod}, UserInfo)
+).
+
 %%% Contractor
 
 -define(cm_contractor_modification(ContractorID, Mod),
