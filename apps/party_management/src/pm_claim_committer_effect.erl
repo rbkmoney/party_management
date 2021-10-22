@@ -11,6 +11,8 @@
 -export([apply_claim_effect/3]).
 -export([apply_effects/3]).
 -export([squash_effects/1]).
+-export([make_changeset_effects/3]).
+-export([make_changeset_safe_effects/3]).
 
 -export_type([effect/0]).
 
@@ -21,6 +23,8 @@
 -type timestamp() :: pm_datetime:timestamp().
 -type revision() :: pm_domain:revision().
 -type party() :: pm_party:party().
+-type effects() :: dmsl_payment_processing_thrift:'ClaimEffects'().
+-type changeset() :: dmsl_claim_management_thrift:'ClaimChangeset'().
 
 -spec make(change(), timestamp(), revision()) -> effect() | no_return().
 make(?cm_contractor_modification(ID, Modification), Timestamp, Revision) ->
@@ -337,4 +341,26 @@ apply_effects(Effects, Timestamp, Party) ->
         end,
         Party,
         Effects
+    ).
+
+-spec make_changeset_effects(changeset(), timestamp(), revision()) -> effects().
+make_changeset_effects(Changeset, Timestamp, Revision) ->
+    pm_claim_committer_effect:squash_effects(
+        lists:map(
+            fun(?cm_party_modification(_, _, Change, _)) ->
+                pm_claim_committer_effect:make(Change, Timestamp, Revision)
+            end,
+            Changeset
+        )
+    ).
+
+-spec make_changeset_safe_effects(changeset(), timestamp(), revision()) -> effects().
+make_changeset_safe_effects(Changeset, Timestamp, Revision) ->
+    pm_claim_committer_effect:squash_effects(
+        lists:map(
+            fun(?cm_party_modification(_, _, Change, _)) ->
+                pm_claim_committer_effect:make_safe(Change, Timestamp, Revision)
+            end,
+            Changeset
+        )
     ).

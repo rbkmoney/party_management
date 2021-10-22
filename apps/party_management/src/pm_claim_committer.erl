@@ -11,13 +11,11 @@
 -export([assert_changeset_applicable/4]).
 -export([assert_changeset_acceptable/4]).
 -export([raise_invalid_changeset/2]).
--export([make_party_effects/3]).
 
 -type party() :: pm_party:party().
 -type changeset() :: dmsl_claim_management_thrift:'ClaimChangeset'().
 -type timestamp() :: pm_datetime:timestamp().
 -type revision() :: pm_domain:revision().
--type effects() :: dmsl_payment_processing_thrift:'ClaimEffects'().
 
 -spec filter_party_changes(changeset()) -> changeset().
 filter_party_changes(Changeset) ->
@@ -250,33 +248,9 @@ raise_invalid_changeset(Reason, InvalidChangeset) ->
 
 -spec assert_changeset_acceptable(changeset(), timestamp(), revision(), party()) -> ok | no_return().
 assert_changeset_acceptable(Changeset, Timestamp, Revision, Party0) ->
-    Effects = make_changeset_safe_effects(Changeset, Timestamp, Revision),
+    Effects = pm_claim_committer_effect:make_changeset_safe_effects(Changeset, Timestamp, Revision),
     Party = pm_claim_committer_effect:apply_effects(Effects, Timestamp, Party0),
     pm_party:assert_party_objects_valid(Timestamp, Revision, Party).
-
--spec make_party_effects(timestamp(), revision(), changeset()) -> effects().
-make_party_effects(Timestamp, Revision, Changeset) ->
-    make_changeset_effects(Changeset, Timestamp, Revision).
-
-make_changeset_effects(Changeset, Timestamp, Revision) ->
-    pm_claim_committer_effect:squash_effects(
-        lists:map(
-            fun(?cm_party_modification(_, _, Change, _)) ->
-                pm_claim_committer_effect:make(Change, Timestamp, Revision)
-            end,
-            Changeset
-        )
-    ).
-
-make_changeset_safe_effects(Changeset, Timestamp, Revision) ->
-    pm_claim_committer_effect:squash_effects(
-        lists:map(
-            fun(?cm_party_modification(_, _, Change, _)) ->
-                pm_claim_committer_effect:make_safe(Change, Timestamp, Revision)
-            end,
-            Changeset
-        )
-    ).
 
 make_optional_domain_ref(_, undefined) ->
     undefined;

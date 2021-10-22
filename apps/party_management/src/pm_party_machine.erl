@@ -254,29 +254,26 @@ handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
         St
     );
 handle_call('Commit', {_PartyID, Claim}, AuxSt, St) ->
-    Changes = get_changes(Claim, St),
-    respond(
-        ok,
-        Changes,
-        AuxSt,
-        St
-    ).
-
-get_changes(#claim_management_Claim{changeset = Changeset} = Claim, St) ->
+    #claim_management_Claim{changeset = Changeset} = Claim,
     Party = get_st_party(St),
     Timestamp = pm_datetime:format_now(),
     DomainRevision = pm_domain:head(),
     PartyChangeset = pm_claim_committer:filter_party_changes(Changeset),
     ok = pm_claim_committer:assert_changeset_acceptable(PartyChangeset, Timestamp, DomainRevision, Party),
-    Effects = pm_claim_committer:make_party_effects(Timestamp, DomainRevision, PartyChangeset),
+    Effects = pm_claim_committer_effect:make_changeset_effects(PartyChangeset, Timestamp, DomainRevision),
     PartyClaim = pm_claim_converter:to_party_claim(Claim),
     AcceptedPartyClaim = set_status(?accepted(Effects), get_next_revision(PartyClaim), Timestamp, PartyClaim),
     PartyRevision = get_next_party_revision(St),
-    [
-        ?claim_created(PartyClaim),
-        finalize_claim(AcceptedPartyClaim, Timestamp),
-        ?revision_changed(Timestamp, PartyRevision)
-    ].
+    respond(
+        ok,
+        [
+            ?claim_created(PartyClaim),
+            finalize_claim(AcceptedPartyClaim, Timestamp),
+            ?revision_changed(Timestamp, PartyRevision)
+        ],
+        AuxSt,
+        St
+    ).
 
 get_next_revision(#payproc_Claim{revision = ClaimRevision}) ->
     ClaimRevision + 1.
