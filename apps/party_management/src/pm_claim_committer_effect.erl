@@ -286,7 +286,7 @@ squash_contract_effect(?contract_effect(ContractID, Mod) = Effect, Squashed) ->
                 {[?contract_effect(ID, {created, update_contract(Mod, Contract)}) | Acc], true};
             (?contract_effect(ID, {created, _}), {_, true}) when ID =:= ContractID ->
                 % One more created contract with same id - error.
-                pm_claim_committer:raise_invalid_changeset(?invalid_contract(ID, {already_exists, ID}), []);
+                pm_claim_committer:raise_invalid_changeset(?cm_invalid_contract_already_exists(ID), []);
             (E, {Acc, Flag}) ->
                 {[E | Acc], Flag}
         end,
@@ -313,7 +313,7 @@ squash_shop_effect(?shop_effect(ShopID, Mod) = Effect, Squashed) ->
                 {[?shop_effect(ID, {created, update_shop(Mod, Shop)}) | Acc], true};
             (?shop_effect(ID, {created, _}), {_, true}) when ID =:= ShopID ->
                 % One more shop with same id - error.
-                pm_claim_committer:raise_invalid_changeset(?invalid_shop(ID, {already_exists, ID}), []);
+                pm_claim_committer:raise_invalid_changeset(?cm_invalid_shop_already_exists(ID), []);
             (E, {Acc, Flag}) ->
                 {[E | Acc], Flag}
         end,
