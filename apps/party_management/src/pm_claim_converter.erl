@@ -67,7 +67,7 @@ to_party_changeset(Changeset) ->
                 }
             ) ->
                 case PartyMod of
-                    ?cm_cash_register_modification_unit_modification(_, _) ->
+                    ?cm_shop_cash_register_modification_unit(_, _) ->
                         false;
                     PartyMod ->
                         {true, to_payproc_party_modification(PartyMod)}

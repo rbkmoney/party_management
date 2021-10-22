@@ -176,10 +176,6 @@
     {revoked, #payproc_ClaimRevoked{reason = Reason}}
 ).
 
--define(account_created(ShopAccount),
-    {account_created, #payproc_ShopAccountCreated{account = ShopAccount}}
-).
-
 -define(revision_changed(Timestamp, Revision),
     {revision_changed, #payproc_PartyRevisionChanged{
         timestamp = Timestamp,

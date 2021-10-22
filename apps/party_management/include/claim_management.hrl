@@ -80,7 +80,7 @@
     }}
 ).
 
--define(cm_cash_register_modification_unit_modification(ShopID, Unit),
+-define(cm_shop_cash_register_modification_unit(ShopID, Unit),
     ?cm_shop_modification(ShopID, {cash_register_modification_unit, Unit})
 ).
 

@@ -23,7 +23,7 @@
 filter_party_changes(Changeset) ->
     lists:filtermap(
         fun
-            (?cm_party_modification(_, _, ?cm_cash_register_modification_unit_modification(_, _), _)) -> false;
+            (?cm_party_modification(_, _, ?cm_shop_cash_register_modification_unit(_, _), _)) -> false;
             (?cm_party_modification(_, _, _, _)) -> true;
             (_) -> false
         end,
@@ -57,7 +57,7 @@ get_party_shop_ids(Party) ->
 get_cash_register_modifications_map(Changeset) ->
     lists:foldl(
         fun
-            (?cm_party_modification(_, _, C = ?cm_cash_register_modification_unit_modification(ShopID, _), _), Acc) ->
+            (?cm_party_modification(_, _, C = ?cm_shop_cash_register_modification_unit(ShopID, _), _), Acc) ->
                 Acc#{ShopID => C};
             (_, Acc) ->
                 Acc
@@ -70,7 +70,7 @@ get_shop_modifications_shop_ids(Changeset) ->
     sets:from_list(
         lists:filtermap(
             fun
-                (?cm_party_modification(_, _, ?cm_cash_register_modification_unit_modification(_, _), _)) ->
+                (?cm_party_modification(_, _, ?cm_shop_cash_register_modification_unit(_, _), _)) ->
                     false;
                 (?cm_party_modification(_, _, ?cm_shop_modification(ShopID, _), _)) ->
                     {true, ShopID};
