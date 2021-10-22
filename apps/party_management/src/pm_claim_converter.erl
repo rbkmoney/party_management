@@ -23,50 +23,29 @@
 -include("party_events.hrl").
 
 %% API
--export([to_party_claim/1]).
+-export([new_party_claim/5]).
 
--type claim_management_claim() :: dmsl_claim_management_thrift:'Claim'().
 -type payproc_claim() :: dmsl_payment_processing_thrift:'Claim'().
+-type changeset() :: dmsl_claim_management_thrift:'ClaimChangeset'().
+-type timestamp() :: pm_datetime:timestamp().
+-type revision() :: pm_domain:revision().
+-type claim_id() :: dmsl_claim_management_thrift:'ClaimID'().
 
--spec to_party_claim(claim_management_claim()) -> payproc_claim().
-to_party_claim(#claim_management_Claim{} = Claim) ->
+-spec new_party_claim(claim_id(), revision(), timestamp(), timestamp(), changeset()) -> payproc_claim().
+new_party_claim(ID, Revision, CreatedAt, UpdatedAt, Changeset) ->
     #payproc_Claim{
-        id = Claim#claim_management_Claim.id,
-        status = to_party_status(Claim#claim_management_Claim.status),
-        changeset = to_party_changeset(Claim#claim_management_Claim.changeset),
-        revision = Claim#claim_management_Claim.revision,
-        created_at = Claim#claim_management_Claim.created_at,
-        updated_at = Claim#claim_management_Claim.updated_at
+        id = ID,
+        status = ?pending(),
+        changeset = to_party_changeset(Changeset),
+        revision = Revision,
+        created_at = CreatedAt,
+        updated_at = UpdatedAt
     }.
 
-%% @doc Convert claim's status between payment processing
-%% and claim management.
-%%
-%% NOTE: Payment processing claim has no ClaimReview and
-%% ClaimPendingAcceptance statuses so map them to ClaimPending
-%% because both mean claim pending acceptance.
-to_party_status(?cm_pending()) ->
-    ?pending();
-to_party_status(?cm_accepted()) ->
-    ?accepted(undefined);
-to_party_status(?cm_denied(R)) ->
-    ?denied(R);
-to_party_status(?cm_revoked(R)) ->
-    ?revoked(R);
-to_party_status(?cm_review()) ->
-    ?pending();
-to_party_status(?cm_pending_acceptance()) ->
-    ?pending().
-
 to_party_changeset(Changeset) ->
-    lists:filtermap(
-        fun
-            (?cm_party_modification(_, _, ?cm_shop_cash_register_modification_unit(_, _), _)) ->
-                false;
-            (?cm_party_modification(_, _, PartyMod, _)) ->
-                {true, to_payproc_party_modification(PartyMod)};
-            (?cm_modification_unit(_, _, _, _)) ->
-                false
+    lists:map(
+        fun(?cm_party_modification(_, _, PartyMod, _)) ->
+            to_payproc_party_modification(PartyMod)
         end,
         Changeset
     ).
