@@ -101,97 +101,11 @@ assert_changeset_applicable([?cm_party_modification(_, _, Change, _) | Others], 
             ok = assert_wallet_change_applicable(ID, Modification, Wallet)
     end,
     Effect = pm_claim_committer_effect:make_safe(Change, Timestamp, Revision),
-    assert_changeset_applicable(Others, Timestamp, Revision, apply_claim_effect(Effect, Timestamp, Party));
+    assert_changeset_applicable(
+        Others, Timestamp, Revision, pm_claim_committer_effect:apply_claim_effect(Effect, Timestamp, Party)
+    );
 assert_changeset_applicable([], _, _, _) ->
     ok.
-
-apply_claim_effect(?contractor_effect(ID, Effect), _, Party) ->
-    apply_contractor_effect(ID, Effect, Party);
-apply_claim_effect(?contract_effect(ID, Effect), Timestamp, Party) ->
-    apply_contract_effect(ID, Effect, Timestamp, Party);
-apply_claim_effect(?shop_effect(ID, Effect), _, Party) ->
-    apply_shop_effect(ID, Effect, Party);
-apply_claim_effect(?wallet_effect(ID, Effect), _, Party) ->
-    apply_wallet_effect(ID, Effect, Party).
-
-apply_contractor_effect(_, {created, PartyContractor}, Party) ->
-    pm_party:set_contractor(PartyContractor, Party);
-apply_contractor_effect(ID, Effect, Party) ->
-    PartyContractor = pm_party:get_contractor(ID, Party),
-    pm_party:set_contractor(update_contractor(Effect, PartyContractor), Party).
-
-update_contractor({identification_level_changed, Level}, PartyContractor) ->
-    PartyContractor#domain_PartyContractor{status = Level};
-update_contractor(
-    {identity_documents_changed, #payproc_ContractorIdentityDocumentsChanged{
-        identity_documents = Docs
-    }},
-    PartyContractor
-) ->
-    PartyContractor#domain_PartyContractor{identity_documents = Docs}.
-
-apply_contract_effect(_, {created, Contract}, Timestamp, Party) ->
-    pm_party:set_new_contract(Contract, Timestamp, Party);
-apply_contract_effect(ID, Effect, _, Party) ->
-    Contract = pm_party:get_contract(ID, Party),
-    pm_party:set_contract(update_contract(Effect, Contract), Party).
-
-update_contract({status_changed, Status}, Contract) ->
-    Contract#domain_Contract{status = Status};
-update_contract({adjustment_created, Adjustment}, Contract) ->
-    Adjustments = Contract#domain_Contract.adjustments ++ [Adjustment],
-    Contract#domain_Contract{adjustments = Adjustments};
-update_contract({payout_tool_created, PayoutTool}, Contract) ->
-    PayoutTools = Contract#domain_Contract.payout_tools ++ [PayoutTool],
-    Contract#domain_Contract{payout_tools = PayoutTools};
-update_contract(
-    {payout_tool_info_changed, #payproc_PayoutToolInfoChanged{payout_tool_id = PayoutToolID, info = Info}},
-    Contract
-) ->
-    PayoutTool = pm_contract:get_payout_tool(PayoutToolID, Contract),
-    pm_contract:set_payout_tool(PayoutTool#domain_PayoutTool{payout_tool_info = Info}, Contract);
-update_contract({legal_agreement_bound, LegalAgreement}, Contract) ->
-    Contract#domain_Contract{legal_agreement = LegalAgreement};
-update_contract({report_preferences_changed, ReportPreferences}, Contract) ->
-    Contract#domain_Contract{report_preferences = ReportPreferences};
-update_contract({contractor_changed, ContractorID}, Contract) ->
-    Contract#domain_Contract{contractor_id = ContractorID}.
-
-apply_shop_effect(_, {created, Shop}, Party) ->
-    pm_party:set_shop(Shop, Party);
-apply_shop_effect(ID, Effect, Party) ->
-    Shop = pm_party:get_shop(ID, Party),
-    pm_party:set_shop(update_shop(Effect, Shop), Party).
-
-update_shop({category_changed, Category}, Shop) ->
-    Shop#domain_Shop{category = Category};
-update_shop({details_changed, Details}, Shop) ->
-    Shop#domain_Shop{details = Details};
-update_shop(
-    {contract_changed, #payproc_ShopContractChanged{contract_id = ContractID, payout_tool_id = PayoutToolID}},
-    Shop
-) ->
-    Shop#domain_Shop{contract_id = ContractID, payout_tool_id = PayoutToolID};
-update_shop({payout_tool_changed, PayoutToolID}, Shop) ->
-    Shop#domain_Shop{payout_tool_id = PayoutToolID};
-update_shop({location_changed, Location}, Shop) ->
-    Shop#domain_Shop{location = Location};
-update_shop({proxy_changed, _}, Shop) ->
-    % deprecated
-    Shop;
-update_shop(?payout_schedule_changed(BusinessScheduleRef), Shop) ->
-    Shop#domain_Shop{payout_schedule = BusinessScheduleRef};
-update_shop({account_created, Account}, Shop) ->
-    Shop#domain_Shop{account = Account}.
-
-apply_wallet_effect(_, {created, Wallet}, Party) ->
-    pm_party:set_wallet(Wallet, Party);
-apply_wallet_effect(ID, Effect, Party) ->
-    Wallet = pm_party:get_wallet(ID, Party),
-    pm_party:set_wallet(update_wallet(Effect, Wallet), Party).
-
-update_wallet({account_created, Account}, Wallet) ->
-    Wallet#domain_Wallet{account = Account}.
 
 assert_contract_change_applicable(_, {creation, _}, undefined) ->
     ok;
@@ -337,7 +251,7 @@ raise_invalid_changeset(Reason, InvalidChangeset) ->
 -spec assert_changeset_acceptable(changeset(), timestamp(), revision(), party()) -> ok | no_return().
 assert_changeset_acceptable(Changeset, Timestamp, Revision, Party0) ->
     Effects = make_changeset_safe_effects(Changeset, Timestamp, Revision),
-    Party = apply_effects(Effects, Timestamp, Party0),
+    Party = pm_claim_committer_effect:apply_effects(Effects, Timestamp, Party0),
     pm_party:assert_party_objects_valid(Timestamp, Revision, Party).
 
 -spec make_party_effects(timestamp(), revision(), changeset()) -> effects().
@@ -345,7 +259,7 @@ make_party_effects(Timestamp, Revision, Changeset) ->
     make_changeset_effects(Changeset, Timestamp, Revision).
 
 make_changeset_effects(Changeset, Timestamp, Revision) ->
-    squash_effects(
+    pm_claim_committer_effect:squash_effects(
         lists:map(
             fun(?cm_party_modification(_, _, Change, _)) ->
                 pm_claim_committer_effect:make(Change, Timestamp, Revision)
@@ -355,88 +269,13 @@ make_changeset_effects(Changeset, Timestamp, Revision) ->
     ).
 
 make_changeset_safe_effects(Changeset, Timestamp, Revision) ->
-    squash_effects(
+    pm_claim_committer_effect:squash_effects(
         lists:map(
             fun(?cm_party_modification(_, _, Change, _)) ->
                 pm_claim_committer_effect:make_safe(Change, Timestamp, Revision)
             end,
             Changeset
         )
-    ).
-
-squash_effects(Effects) ->
-    squash_effects(Effects, []).
-
-squash_effects([?contract_effect(_, _) = Effect | Others], Squashed) ->
-    squash_effects(Others, squash_contract_effect(Effect, Squashed));
-squash_effects([?shop_effect(_, _) = Effect | Others], Squashed) ->
-    squash_effects(Others, squash_shop_effect(Effect, Squashed));
-squash_effects([Effect | Others], Squashed) ->
-    squash_effects(Others, Squashed ++ [Effect]);
-squash_effects([], Squashed) ->
-    Squashed.
-
-squash_contract_effect(?contract_effect(_, {created, _}) = Effect, Squashed) ->
-    Squashed ++ [Effect];
-squash_contract_effect(?contract_effect(ContractID, Mod) = Effect, Squashed) ->
-    % Try to find contract creation in squashed effects
-    {ReversedEffects, AppliedFlag} = lists:foldl(
-        fun
-            (?contract_effect(ID, {created, Contract}), {Acc, false}) when ID =:= ContractID ->
-                % Contract creation found, lets update it with this claim effect
-                {[?contract_effect(ID, {created, update_contract(Mod, Contract)}) | Acc], true};
-            (?contract_effect(ID, {created, _}), {_, true}) when ID =:= ContractID ->
-                % One more created contract with same id - error.
-                raise_invalid_changeset(?invalid_contract(ID, {already_exists, ID}), []);
-            (E, {Acc, Flag}) ->
-                {[E | Acc], Flag}
-        end,
-        {[], false},
-        Squashed
-    ),
-    case AppliedFlag of
-        true ->
-            lists:reverse(ReversedEffects);
-        false ->
-            % Contract creation not found, so this contract created earlier and we shuold just
-            % add this claim effect to the end of squashed effects
-            lists:reverse([Effect | ReversedEffects])
-    end.
-
-squash_shop_effect(?shop_effect(_, {created, _}) = Effect, Squashed) ->
-    Squashed ++ [Effect];
-squash_shop_effect(?shop_effect(ShopID, Mod) = Effect, Squashed) ->
-    % Try to find shop creation in squashed effects
-    {ReversedEffects, AppliedFlag} = lists:foldl(
-        fun
-            (?shop_effect(ID, {created, Shop}), {Acc, false}) when ID =:= ShopID ->
-                % Shop creation found, lets update it with this claim effect
-                {[?shop_effect(ID, {created, update_shop(Mod, Shop)}) | Acc], true};
-            (?shop_effect(ID, {created, _}), {_, true}) when ID =:= ShopID ->
-                % One more shop with same id - error.
-                raise_invalid_changeset(?invalid_shop(ID, {already_exists, ID}), []);
-            (E, {Acc, Flag}) ->
-                {[E | Acc], Flag}
-        end,
-        {[], false},
-        Squashed
-    ),
-    case AppliedFlag of
-        true ->
-            lists:reverse(ReversedEffects);
-        false ->
-            % Shop creation not found, so this shop created earlier and we shuold just
-            % add this claim effect to the end of squashed effects
-            lists:reverse([Effect | ReversedEffects])
-    end.
-
-apply_effects(Effects, Timestamp, Party) ->
-    lists:foldl(
-        fun(Effect, AccParty) ->
-            apply_claim_effect(Effect, Timestamp, AccParty)
-        end,
-        Party,
-        Effects
     ).
 
 make_optional_domain_ref(_, undefined) ->
