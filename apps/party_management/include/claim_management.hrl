@@ -27,15 +27,6 @@
     ?cm_contractor_modification(ContractorID, {creation, Contractor})
 ).
 
--define(cm_identity_documents_modification(Documents),
-    {
-        identity_documents_modification,
-        #claim_management_ContractorIdentityDocumentsModification{
-            identity_documents = Documents
-        }
-    }
-).
-
 -define(cm_contractor_identity_documents_modification(ContractorID, Documents),
     ?cm_contractor_modification(ContractorID, ?cm_identity_documents_modification(Documents))
 ).
@@ -104,12 +95,10 @@
     }}
 ).
 
--define(cm_adjustment_creation(ContractAdjustmentID, ContractTemplateRef),
+-define(cm_adjustment_creation(ContractAdjustmentID, Params),
     ?cm_adjustment_modification(
         ContractAdjustmentID,
-        {creation, #claim_management_ContractAdjustmentParams{
-            template = ContractTemplateRef
-        }}
+        {creation, Params}
     )
 ).
 
@@ -151,6 +140,29 @@
     {wallet_modification, #claim_management_WalletModificationUnit{id = ID, modification = Modification}}
 ).
 
+-define(cm_pending(),
+    {pending, #claim_management_ClaimPending{}}
+).
+
+-define(cm_accepted(),
+    {accepted, #claim_management_ClaimAccepted{}}
+).
+
+-define(cm_denied(Reason),
+    {denied, #claim_management_ClaimDenied{reason = Reason}}
+).
+
+-define(cm_revoked(Reason),
+    {revoked, #claim_management_ClaimRevoked{reason = Reason}}
+).
+
+-define(cm_pending_acceptance(),
+    {pending_acceptance, #claim_management_ClaimPendingAcceptance{}}
+).
+
+-define(cm_review(),
+    {review, #claim_management_ClaimReview{}}
+).
 
 %%% Error
 
@@ -167,17 +179,48 @@
     ?cm_invalid_shop(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}})
 ).
 
+-define(cm_invalid_shop_already_exists(ID),
+    ?cm_invalid_shop(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
 
 -define(cm_invalid_contract(ID, Reason),
     {invalid_contract, #claim_management_InvalidContract{id = ID, reason = Reason}}
+).
+
+-define(cm_invalid_contract_not_exists(ID),
+    ?cm_invalid_contract(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
+-define(cm_invalid_contract_already_exists(ID),
+    ?cm_invalid_contract(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
+-define(cm_invalid_contract_invalid_status_terminated(ID, T),
+    ?cm_invalid_contract(ID, {invalid_status, {terminated, #domain_ContractTerminated{terminated_at = T}}})
 ).
 
 -define(cm_invalid_contractor(ID, Reason),
     {invalid_contractor, #claim_management_InvalidContractor{id = ID, reason = Reason}}
 ).
 
+-define(cm_invalid_contractor_not_exists(ID),
+    ?cm_invalid_contractor(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
+-define(cm_invalid_contractor_already_exists(ID),
+    ?cm_invalid_contractor(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
 -define(cm_invalid_wallet(ID, Reason),
     {invalid_wallet, #claim_management_InvalidWallet{id = ID, reason = Reason}}
+).
+
+-define(cm_invalid_wallet_not_exists(ID),
+    ?cm_invalid_wallet(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
+-define(cm_invalid_wallet_already_exists(ID),
+    ?cm_invalid_wallet(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}})
 ).
 
 -endif.

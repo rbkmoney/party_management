@@ -206,8 +206,8 @@ contract_adjustment_creation(C) ->
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID1,
     ID = <<"ADJ1">>,
-    AdjustmentTemplate = #domain_ContractTemplateRef{id = 2},
-    Modifications = [?cm_contract_modification(ContractID, ?cm_adjustment_creation(ID, AdjustmentTemplate))],
+    AdjustmentParams = #claim_management_ContractAdjustmentParams{template = #domain_ContractTemplateRef{id = 2}},
+    Modifications = [?cm_contract_modification(ContractID, ?cm_adjustment_creation(ID, AdjustmentParams))],
     Claim = claim(Modifications, PartyID),
     ok = accept_claim(Claim, C),
     ok = commit_claim(Claim, C),
@@ -395,12 +395,8 @@ contractor_already_exists(C) ->
     ContractorID = ?REAL_CONTRACTOR_ID1,
     Modifications = [?cm_contractor_creation(ContractorID, ContractorParams)],
     Claim = claim(Modifications, PartyID),
-    Reason =
-        <<"{invalid_contractor,{payproc_InvalidContractor,<<\"", ContractorID/binary, "\">>,{already_exists,<<\"",
-            ContractorID/binary, "\">>}}}">>,
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = Reason
-    }} = accept_claim(Claim, C).
+    {exception, ?cm_invalid_party_changeset(?cm_invalid_contractor_already_exists(ContractorID), [])} =
+        accept_claim(Claim, C).
 
 -spec contract_already_exists(config()) -> _.
 contract_already_exists(C) ->
@@ -409,12 +405,8 @@ contract_already_exists(C) ->
     ContractID = ?REAL_CONTRACT_ID1,
     Modifications = [?cm_contract_creation(ContractID, ContractParams)],
     Claim = claim(Modifications, PartyID),
-    Reason =
-        <<"{invalid_contract,{payproc_InvalidContract,<<\"", ContractID/binary, "\">>,{already_exists,<<\"",
-            ContractID/binary, "\">>}}}">>,
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = Reason
-    }} = accept_claim(Claim, C).
+    {exception, ?cm_invalid_party_changeset(?cm_invalid_contract_already_exists(ContractID), [])} =
+        accept_claim(Claim, C).
 
 -spec contract_already_terminated(config()) -> _.
 contract_already_terminated(C) ->
@@ -423,13 +415,8 @@ contract_already_terminated(C) ->
     Reason = #claim_management_ContractTermination{reason = <<"Because!">>},
     Modifications = [?cm_contract_modification(ContractID, {termination, Reason})],
     Claim = claim(Modifications, PartyID),
-    ErrorReason =
-        <<"{invalid_contract,{payproc_InvalidContract,<<\"", ContractID/binary,
-            "\">>,{invalid_status,{terminated,{domain_ContractTerminated">>,
-    ErrorReasonSize = erlang:byte_size(ErrorReason),
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = <<ErrorReason:ErrorReasonSize/binary, _/binary>>
-    }} = accept_claim(Claim, C).
+    {exception, ?cm_invalid_party_changeset(?cm_invalid_contract_invalid_status_terminated(ContractID, _), [])} =
+        accept_claim(Claim, C).
 
 -spec shop_already_exists(config()) -> _.
 shop_already_exists(C) ->
@@ -453,12 +440,8 @@ shop_already_exists(C) ->
         ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
     ],
     Claim = claim(Modifications, PartyID),
-    Reason =
-        <<"{invalid_shop,{payproc_InvalidShop,<<\"", ShopID/binary, "\">>,{already_exists,<<\"", ShopID/binary,
-            "\">>}}}">>,
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = Reason
-    }} = accept_claim(Claim, C).
+    {exception, ?cm_invalid_party_changeset(?cm_invalid_shop_already_exists(ShopID), [])} =
+        accept_claim(Claim, C).
 
 %%% Internal functions
 

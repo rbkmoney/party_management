@@ -1,5 +1,6 @@
 -module(pm_wallet).
 
+-include("claim_management.hrl").
 -include("party_events.hrl").
 
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
@@ -14,14 +15,32 @@
 
 -type wallet() :: dmsl_domain_thrift:'Wallet'().
 -type wallet_id() :: dmsl_domain_thrift:'WalletID'().
--type wallet_params() :: dmsl_payment_processing_thrift:'WalletParams'().
+-type wallet_params() ::
+    dmsl_payment_processing_thrift:'WalletParams'() | dmsl_claim_management_thrift:'WalletParams'().
 -type wallet_account() :: dmsl_domain_thrift:'WalletAccount'().
--type wallet_account_params() :: dmsl_payment_processing_thrift:'WalletAccountParams'().
+-type wallet_account_params() ::
+    dmsl_payment_processing_thrift:'WalletAccountParams'() | dmsl_claim_management_thrift:'WalletAccountParams'().
 
 -spec create(wallet_id(), wallet_params(), pm_datetime:timestamp()) -> wallet().
 create(
     ID,
     #payproc_WalletParams{
+        name = Name,
+        contract_id = ContractID
+    },
+    Timestamp
+) ->
+    #domain_Wallet{
+        id = ID,
+        name = Name,
+        created_at = Timestamp,
+        blocking = ?unblocked(Timestamp),
+        suspension = ?active(Timestamp),
+        contract = ContractID
+    };
+create(
+    ID,
+    #claim_management_WalletParams{
         name = Name,
         contract_id = ContractID
     },
@@ -45,10 +64,25 @@ create_account(#payproc_WalletAccountParams{currency = Currency}) ->
         currency = Currency,
         settlement = SettlementID,
         payout = PayoutID
+    };
+create_account(#claim_management_WalletAccountParams{currency = Currency}) ->
+    SymbolicCode = Currency#domain_CurrencyRef.symbolic_code,
+    SettlementID = pm_accounting:create_account(SymbolicCode),
+    PayoutID = pm_accounting:create_account(SymbolicCode),
+    #domain_WalletAccount{
+        currency = Currency,
+        settlement = SettlementID,
+        payout = PayoutID
     }.
 
 -spec create_fake_account(wallet_account_params()) -> wallet_account().
 create_fake_account(#payproc_WalletAccountParams{currency = Currency}) ->
+    #domain_WalletAccount{
+        currency = Currency,
+        settlement = 0,
+        payout = 0
+    };
+create_fake_account(#claim_management_WalletAccountParams{currency = Currency}) ->
     #domain_WalletAccount{
         currency = Currency,
         settlement = 0,

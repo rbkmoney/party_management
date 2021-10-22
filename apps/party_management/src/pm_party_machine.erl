@@ -239,22 +239,15 @@ handle_call('RevokeClaim', {_, _PartyID, ID, ClaimRevision, Reason}, AuxSt, St) 
 %% ClaimCommitter
 
 handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
-    #claim_management_Claim{
-        changeset = Changeset
-    } = Claim,
+    #claim_management_Claim{changeset = Changeset} = Claim,
     try
         Party = get_st_party(St),
+        Timestamp = pm_datetime:format_now(),
+        Revision = pm_domain:head(),
         ok = pm_claim_committer:assert_cash_register_modifications_applicable(Changeset, Party),
-        case pm_claim_committer:from_claim_mgmt(Claim) of
-            undefined ->
-                ok;
-            PayprocClaim ->
-                Timestamp = pm_datetime:format_now(),
-                Revision = pm_domain:head(),
-
-                ok = pm_claim_committer:assert_changeset_applicable(Changeset, Timestamp, Revision, Party),
-                ok = pm_claim_committer:assert_acceptable(PayprocClaim, Timestamp, Revision, Party)
-        end,
+        PartyChangeset = pm_claim_committer:filter_party_changes(Changeset),
+        ok = pm_claim_committer:assert_changeset_applicable(PartyChangeset, Timestamp, Revision, Party),
+        ok = pm_claim_committer:assert_changeset_acceptable(PartyChangeset, Timestamp, Revision, Party),
         respond(
             ok,
             [],
@@ -279,9 +272,8 @@ handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
                 reason_legacy = ReasonLegacy
             })
     end;
-handle_call('Commit', {_PartyID, CmClaim}, AuxSt, St) ->
-    PayprocClaim = pm_claim_committer:from_claim_mgmt(CmClaim),
-    Changes = get_changes(PayprocClaim, St),
+handle_call('Commit', {_PartyID, Claim}, AuxSt, St) ->
+    Changes = get_changes(Claim, St),
     respond(
         ok,
         Changes,
@@ -289,19 +281,31 @@ handle_call('Commit', {_PartyID, CmClaim}, AuxSt, St) ->
         St
     ).
 
-get_changes(undefined, _St) ->
-    [];
-get_changes(PayprocClaim, St) ->
-    Timestamp = pm_datetime:format_now(),
-    Revision = pm_domain:head(),
+get_changes(#claim_management_Claim{changeset = Changeset} = Claim, St) ->
     Party = get_st_party(St),
-    AcceptedClaim = pm_claim:accept(Timestamp, Revision, Party, PayprocClaim),
+    Timestamp = pm_datetime:format_now(),
+    DomainRevision = pm_domain:head(),
+    PartyChangeset = pm_claim_committer:filter_party_changes(Changeset),
+    ok = pm_claim_committer:assert_changeset_acceptable(PartyChangeset, Timestamp, DomainRevision, Party),
+    Effects = pm_claim_committer:make_party_effects(Timestamp, DomainRevision, PartyChangeset),
+    PartyClaim = pm_claim_converter:to_party_claim(Claim),
+    AcceptedPartyClaim = set_status(?accepted(Effects), get_next_revision(PartyClaim), Timestamp, PartyClaim),
     PartyRevision = get_next_party_revision(St),
     [
-        ?claim_created(PayprocClaim),
-        finalize_claim(AcceptedClaim, Timestamp),
+        ?claim_created(PartyClaim),
+        finalize_claim(AcceptedPartyClaim, Timestamp),
         ?revision_changed(Timestamp, PartyRevision)
     ].
+
+get_next_revision(#payproc_Claim{revision = ClaimRevision}) ->
+    ClaimRevision + 1.
+
+set_status(Status, NewRevision, Timestamp, Claim) ->
+    Claim#payproc_Claim{
+        revision = NewRevision,
+        updated_at = Timestamp,
+        status = Status
+    }.
 
 %% Generic handlers
 

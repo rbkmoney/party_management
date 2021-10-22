@@ -1,5 +1,6 @@
 -module(pm_contract).
 
+-include_lib("damsel/include/dmsl_claim_management_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 
 %%
@@ -20,11 +21,14 @@
 
 -type contract() :: dmsl_domain_thrift:'Contract'().
 -type contract_id() :: dmsl_domain_thrift:'ContractID'().
--type contract_params() :: dmsl_payment_processing_thrift:'ContractParams'().
+-type contract_params() ::
+    dmsl_payment_processing_thrift:'ContractParams'() | dmsl_claim_management_thrift:'ContractParams'().
 -type contract_template() :: dmsl_domain_thrift:'ContractTemplate'().
 -type adjustment() :: dmsl_domain_thrift:'ContractAdjustment'().
 -type adjustment_id() :: dmsl_domain_thrift:'ContractAdjustmentID'().
--type adjustment_params() :: dmsl_payment_processing_thrift:'ContractAdjustmentParams'().
+-type adjustment_params() ::
+    dmsl_payment_processing_thrift:'ContractAdjustmentParams'()
+    | dmsl_claim_management_thrift:'ContractAdjustmentParams'().
 -type payout_tool() :: dmsl_domain_thrift:'PayoutTool'().
 -type payout_tool_id() :: dmsl_domain_thrift:'PayoutToolID'().
 -type category() :: dmsl_domain_thrift:'CategoryRef'().
@@ -37,7 +41,7 @@
 %%
 
 -spec create(contract_id(), contract_params(), timestamp(), revision()) -> contract().
-create(ID, Params, Timestamp, Revision) ->
+create(ID, #payproc_ContractParams{} = Params, Timestamp, Revision) ->
     #payproc_ContractParams{
         contractor_id = ContractorID,
         %% Legacy
@@ -54,6 +58,30 @@ create(ID, Params, Timestamp, Revision) ->
         id = ID,
         contractor_id = ContractorID,
         contractor = Contractor,
+        payment_institution = PaymentInstitutionRef,
+        created_at = Timestamp,
+        valid_since = instantiate_contract_lifetime_bound(ValidSince, Timestamp),
+        valid_until = instantiate_contract_lifetime_bound(ValidUntil, Timestamp),
+        status = {active, #domain_ContractActive{}},
+        terms = TermSetHierarchyRef,
+        adjustments = [],
+        payout_tools = []
+    };
+create(ID, #claim_management_ContractParams{} = Params, Timestamp, Revision) ->
+    #claim_management_ContractParams{
+        contractor_id = ContractorID,
+        %% Legacy
+        template = TemplateRef,
+        payment_institution = PaymentInstitutionRef
+    } = ensure_contract_creation_params(Params, Revision),
+    #domain_ContractTemplate{
+        valid_since = ValidSince,
+        valid_until = ValidUntil,
+        terms = TermSetHierarchyRef
+    } = get_template(TemplateRef, Revision),
+    #domain_Contract{
+        id = ID,
+        contractor_id = ContractorID,
         payment_institution = PaymentInstitutionRef,
         created_at = Timestamp,
         valid_since = instantiate_contract_lifetime_bound(ValidSince, Timestamp),
@@ -86,8 +114,24 @@ update_status(Contract, _) ->
 
 %% TODO should be in separate module
 -spec create_adjustment(adjustment_id(), adjustment_params(), timestamp(), revision()) -> adjustment().
-create_adjustment(ID, Params, Timestamp, Revision) ->
+create_adjustment(ID, #payproc_ContractAdjustmentParams{} = Params, Timestamp, Revision) ->
     #payproc_ContractAdjustmentParams{
+        template = TemplateRef
+    } = Params,
+    #domain_ContractTemplate{
+        valid_since = ValidSince,
+        valid_until = ValidUntil,
+        terms = TermSetHierarchyRef
+    } = get_template(TemplateRef, Revision),
+    #domain_ContractAdjustment{
+        id = ID,
+        created_at = Timestamp,
+        valid_since = instantiate_contract_lifetime_bound(ValidSince, Timestamp),
+        valid_until = instantiate_contract_lifetime_bound(ValidUntil, Timestamp),
+        terms = TermSetHierarchyRef
+    };
+create_adjustment(ID, #claim_management_ContractAdjustmentParams{} = Params, Timestamp, Revision) ->
+    #claim_management_ContractAdjustmentParams{
         template = TemplateRef
     } = Params,
     #domain_ContractTemplate{
@@ -167,6 +211,18 @@ ensure_contract_creation_params(
 ) ->
     ValidRef = ensure_payment_institution(PaymentInstitutionRef),
     Params#payproc_ContractParams{
+        template = ensure_contract_template(TemplateRef, ValidRef, Revision),
+        payment_institution = ValidRef
+    };
+ensure_contract_creation_params(
+    #claim_management_ContractParams{
+        template = TemplateRef,
+        payment_institution = PaymentInstitutionRef
+    } = Params,
+    Revision
+) ->
+    ValidRef = ensure_payment_institution(PaymentInstitutionRef),
+    Params#claim_management_ContractParams{
         template = ensure_contract_template(TemplateRef, ValidRef, Revision),
         payment_institution = ValidRef
     }.

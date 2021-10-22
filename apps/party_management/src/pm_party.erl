@@ -11,6 +11,7 @@
 
 -include("party_events.hrl").
 
+-include_lib("damsel/include/dmsl_claim_management_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 -include_lib("damsel/include/dmsl_accounter_thrift.hrl").
 
@@ -67,7 +68,7 @@
 -type contract_template() :: dmsl_domain_thrift:'ContractTemplate'().
 -type shop() :: dmsl_domain_thrift:'Shop'().
 -type shop_id() :: dmsl_domain_thrift:'ShopID'().
--type shop_params() :: dmsl_payment_processing_thrift:'ShopParams'().
+-type shop_params() :: dmsl_payment_processing_thrift:'ShopParams'() | dmsl_claim_management_thrift:'ShopParams'().
 -type wallet() :: dmsl_domain_thrift:'Wallet'().
 -type wallet_id() :: dmsl_domain_thrift:'WalletID'().
 
@@ -144,7 +145,7 @@ get_terms(#domain_ContractTemplate{terms = TermSetHierarchyRef}, Timestamp, Revi
     get_term_set(TermSetHierarchyRef, Timestamp, Revision).
 
 -spec create_shop(shop_id(), shop_params(), timestamp()) -> shop().
-create_shop(ID, ShopParams, Timestamp) ->
+create_shop(ID, #payproc_ShopParams{} = ShopParams, Timestamp) ->
     #domain_Shop{
         id = ID,
         created_at = Timestamp,
@@ -155,6 +156,18 @@ create_shop(ID, ShopParams, Timestamp) ->
         location = ShopParams#payproc_ShopParams.location,
         contract_id = ShopParams#payproc_ShopParams.contract_id,
         payout_tool_id = ShopParams#payproc_ShopParams.payout_tool_id
+    };
+create_shop(ID, #claim_management_ShopParams{} = ShopParams, Timestamp) ->
+    #domain_Shop{
+        id = ID,
+        created_at = Timestamp,
+        blocking = ?unblocked(Timestamp),
+        suspension = ?active(Timestamp),
+        category = ShopParams#claim_management_ShopParams.category,
+        details = ShopParams#claim_management_ShopParams.details,
+        location = ShopParams#claim_management_ShopParams.location,
+        contract_id = ShopParams#claim_management_ShopParams.contract_id,
+        payout_tool_id = ShopParams#claim_management_ShopParams.payout_tool_id
     }.
 
 -spec get_shop(shop_id(), party()) -> shop() | undefined.

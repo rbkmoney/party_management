@@ -6,39 +6,29 @@
 -include("claim_management.hrl").
 -include("party_events.hrl").
 
--export([from_claim_mgmt/1]).
+-export([filter_party_changes/1]).
 -export([assert_cash_register_modifications_applicable/2]).
--export([assert_applicable/4]).
 -export([assert_changeset_applicable/4]).
--export([assert_acceptable/4]).
+-export([assert_changeset_acceptable/4]).
+-export([raise_invalid_changeset/2]).
+-export([make_party_effects/3]).
 
 -type party() :: pm_party:party().
 -type changeset() :: dmsl_claim_management_thrift:'ClaimChangeset'().
--type claim() :: dmsl_payment_processing_thrift:'Claim'().
 -type timestamp() :: pm_datetime:timestamp().
 -type revision() :: pm_domain:revision().
+-type effects() :: dmsl_payment_processing_thrift:'ClaimEffects'().
 
--spec from_claim_mgmt(dmsl_claim_management_thrift:'Claim'()) -> dmsl_payment_processing_thrift:'Claim'() | undefined.
-from_claim_mgmt(#claim_management_Claim{
-    id = ID,
-    changeset = Changeset,
-    revision = Revision,
-    created_at = CreatedAt,
-    updated_at = UpdatedAt
-}) ->
-    case from_cm_changeset(Changeset) of
-        [] ->
-            undefined;
-        Converted ->
-            #payproc_Claim{
-                id = ID,
-                status = ?pending(),
-                changeset = Converted,
-                revision = Revision,
-                created_at = CreatedAt,
-                updated_at = UpdatedAt
-            }
-    end.
+-spec filter_party_changes(changeset()) -> changeset().
+filter_party_changes(Changeset) ->
+    lists:filtermap(
+        fun
+            (?cm_party_modification(_, _, ?cm_cash_register_modification_unit_modification(_, _), _)) -> false;
+            (?cm_party_modification(_, _, _, _)) -> true;
+            (_) -> false
+        end,
+        Changeset
+    ).
 
 -spec assert_cash_register_modifications_applicable(changeset(), party()) -> ok | no_return().
 assert_cash_register_modifications_applicable(Changeset, Party) ->
@@ -51,117 +41,10 @@ assert_cash_register_modifications_applicable(Changeset, Party) ->
         false ->
             ShopID = hd(sets:to_list(sets:subtract(CashRegisterShopIDs, ShopIDs))),
             InvalidChangeset = maps:get(ShopID, MappedChanges),
-            throw(?cm_invalid_party_changeset(?cm_invalid_shop_not_exists(ShopID), [InvalidChangeset]))
+            raise_invalid_changeset(?cm_invalid_shop_not_exists(ShopID), [InvalidChangeset])
     end.
 
 %%% Internal functions
-
-from_cm_changeset(Changeset) ->
-    lists:filtermap(
-        fun
-            (
-                #claim_management_ModificationUnit{
-                    modification = {party_modification, PartyMod}
-                }
-            ) ->
-                case PartyMod of
-                    ?cm_cash_register_modification_unit_modification(_, _) ->
-                        false;
-                    PartyMod ->
-                        {true, from_cm_party_mod(PartyMod)}
-                end;
-            (
-                #claim_management_ModificationUnit{
-                    modification = {claim_modification, _}
-                }
-            ) ->
-                false
-        end,
-        Changeset
-    ).
-
-from_cm_party_mod(?cm_contractor_modification(ContractorID, ContractorModification)) ->
-    ?contractor_modification(ContractorID, ContractorModification);
-from_cm_party_mod(?cm_contract_modification(ContractID, ContractModification)) ->
-    ?contract_modification(
-        ContractID,
-        from_cm_contract_modification(ContractModification)
-    );
-from_cm_party_mod(?cm_shop_modification(ShopID, ShopModification)) ->
-    ?shop_modification(
-        ShopID,
-        from_cm_shop_modification(ShopModification)
-    ).
-
-from_cm_contract_modification(
-    {creation, #claim_management_ContractParams{
-        contractor_id = ContractorID,
-        template = ContractTemplateRef,
-        payment_institution = PaymentInstitutionRef
-    }}
-) ->
-    {creation, #payproc_ContractParams{
-        contractor_id = ContractorID,
-        template = ContractTemplateRef,
-        payment_institution = PaymentInstitutionRef
-    }};
-from_cm_contract_modification(?cm_contract_termination(Reason)) ->
-    ?contract_termination(Reason);
-from_cm_contract_modification(?cm_adjustment_creation(ContractAdjustmentID, ContractTemplateRef)) ->
-    ?adjustment_creation(
-        ContractAdjustmentID,
-        #payproc_ContractAdjustmentParams{template = ContractTemplateRef}
-    );
-from_cm_contract_modification(
-    ?cm_payout_tool_creation(PayoutToolID, #claim_management_PayoutToolParams{
-        currency = CurrencyRef,
-        tool_info = PayoutToolInfo
-    })
-) ->
-    ?payout_tool_creation(PayoutToolID, #payproc_PayoutToolParams{
-        currency = CurrencyRef,
-        tool_info = PayoutToolInfo
-    });
-from_cm_contract_modification(
-    ?cm_payout_tool_info_modification(PayoutToolID, PayoutToolModification)
-) ->
-    ?payout_tool_info_modification(PayoutToolID, PayoutToolModification);
-from_cm_contract_modification({legal_agreement_binding, _LegalAgreement} = LegalAgreementBinding) ->
-    LegalAgreementBinding;
-from_cm_contract_modification({report_preferences_modification, _ReportPreferences} = ReportPreferencesModification) ->
-    ReportPreferencesModification;
-from_cm_contract_modification({contractor_modification, _ContractorID} = ContractorModification) ->
-    ContractorModification.
-
-from_cm_shop_modification({creation, ShopParams}) ->
-    #claim_management_ShopParams{
-        category = CategoryRef,
-        location = ShopLocation,
-        details = ShopDetails,
-        contract_id = ContractID,
-        payout_tool_id = PayoutToolID
-    } = ShopParams,
-    {creation, #payproc_ShopParams{
-        category = CategoryRef,
-        location = ShopLocation,
-        details = ShopDetails,
-        contract_id = ContractID,
-        payout_tool_id = PayoutToolID
-    }};
-from_cm_shop_modification({category_modification, _CategoryRef} = CategoryModification) ->
-    CategoryModification;
-from_cm_shop_modification({details_modification, _ShopDetails} = DetailsModification) ->
-    DetailsModification;
-from_cm_shop_modification(?cm_shop_contract_modification(ContractID, PayoutToolID)) ->
-    ?shop_contract_modification(ContractID, PayoutToolID);
-from_cm_shop_modification({payout_tool_modification, _PayoutToolID} = PayoutToolModification) ->
-    PayoutToolModification;
-from_cm_shop_modification({location_modification, _ShopLocation} = LocationModification) ->
-    LocationModification;
-from_cm_shop_modification(?cm_shop_account_creation_params(CurrencyRef)) ->
-    ?shop_account_creation_params(CurrencyRef);
-from_cm_shop_modification(?cm_payout_schedule_modification(BusinessScheduleRef)) ->
-    ?payout_schedule_modification(BusinessScheduleRef).
 
 get_all_valid_shop_ids(Changeset, Party) ->
     ShopModificationsShopIDs = get_shop_modifications_shop_ids(Changeset),
@@ -174,12 +57,7 @@ get_party_shop_ids(Party) ->
 get_cash_register_modifications_map(Changeset) ->
     lists:foldl(
         fun
-            (
-                #claim_management_ModificationUnit{
-                    modification = C = {party_modification, ?cm_cash_register_modification_unit_modification(ShopID, _)}
-                },
-                Acc
-            ) ->
+            (?cm_party_modification(_, _, C = ?cm_cash_register_modification_unit_modification(ShopID, _), _), Acc) ->
                 Acc#{ShopID => C};
             (_, Acc) ->
                 Acc
@@ -192,17 +70,9 @@ get_shop_modifications_shop_ids(Changeset) ->
     sets:from_list(
         lists:filtermap(
             fun
-                (
-                    #claim_management_ModificationUnit{
-                        modification = {party_modification, ?cm_cash_register_modification_unit_modification(_, _)}
-                    }
-                ) ->
+                (?cm_party_modification(_, _, ?cm_cash_register_modification_unit_modification(_, _), _)) ->
                     false;
-                (
-                    #claim_management_ModificationUnit{
-                        modification = {party_modification, ?cm_shop_modification(ShopID, _)}
-                    }
-                ) ->
+                (?cm_party_modification(_, _, ?cm_shop_modification(ShopID, _), _)) ->
                     {true, ShopID};
                 (_) ->
                     false
@@ -211,15 +81,8 @@ get_shop_modifications_shop_ids(Changeset) ->
         )
     ).
 
--spec assert_applicable(claim(), timestamp(), revision(), party()) -> ok | no_return().
-assert_applicable(Claim, Timestamp, Revision, Party) ->
-    assert_changeset_applicable(get_changeset(Claim), Timestamp, Revision, Party).
-
-get_changeset(#payproc_Claim{changeset = Changeset}) ->
-    Changeset.
-
 -spec assert_changeset_applicable(changeset(), timestamp(), revision(), party()) -> ok | no_return().
-assert_changeset_applicable([Change | Others], Timestamp, Revision, Party) ->
+assert_changeset_applicable([?cm_party_modification(_, _, Change, _) | Others], Timestamp, Revision, Party) ->
     case Change of
         ?cm_contract_modification(ID, Modification) ->
             Contract = pm_party:get_contract(ID, Party),
@@ -234,7 +97,7 @@ assert_changeset_applicable([Change | Others], Timestamp, Revision, Party) ->
             Wallet = pm_party:get_wallet(ID, Party),
             ok = assert_wallet_change_applicable(ID, Modification, Wallet)
     end,
-    Effect = pm_claim_effect:make_safe(Change, Timestamp, Revision),
+    Effect = pm_claim_committer_effect:make_safe(Change, Timestamp, Revision),
     assert_changeset_applicable(Others, Timestamp, Revision, apply_claim_effect(Effect, Timestamp, Party));
 assert_changeset_applicable([], _, _, _) ->
     ok.
@@ -330,34 +193,36 @@ update_wallet({account_created, Account}, Wallet) ->
 assert_contract_change_applicable(_, {creation, _}, undefined) ->
     ok;
 assert_contract_change_applicable(ID, {creation, _}, #domain_Contract{}) ->
-    raise_invalid_changeset(?cm_invalid_contract(ID, {already_exists, ID}));
+    raise_invalid_changeset(
+        ?cm_invalid_contract(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}}), []
+    );
 assert_contract_change_applicable(ID, _AnyModification, undefined) ->
-    raise_invalid_changeset(?cm_invalid_contract(ID, {not_exists, ID}));
+    raise_invalid_changeset(?cm_invalid_contract(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}), []);
 assert_contract_change_applicable(ID, ?cm_contract_termination(_), Contract) ->
     case pm_contract:is_active(Contract) of
         true ->
             ok;
         false ->
-            raise_invalid_changeset(?cm_invalid_contract(ID, {invalid_status, Contract#domain_Contract.status}))
+            raise_invalid_changeset(?cm_invalid_contract(ID, {invalid_status, Contract#domain_Contract.status}), [])
     end;
 assert_contract_change_applicable(ID, ?cm_adjustment_creation(AdjustmentID, _), Contract) ->
     case pm_contract:get_adjustment(AdjustmentID, Contract) of
         undefined ->
             ok;
         _ ->
-            raise_invalid_changeset(?cm_invalid_contract(ID, {contract_adjustment_already_exists, AdjustmentID}))
+            raise_invalid_changeset(?cm_invalid_contract(ID, {contract_adjustment_already_exists, AdjustmentID}), [])
     end;
 assert_contract_change_applicable(ID, ?cm_payout_tool_creation(PayoutToolID, _), Contract) ->
     case pm_contract:get_payout_tool(PayoutToolID, Contract) of
         undefined ->
             ok;
         _ ->
-            raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_already_exists, PayoutToolID}))
+            raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_already_exists, PayoutToolID}), [])
     end;
 assert_contract_change_applicable(ID, ?cm_payout_tool_info_modification(PayoutToolID, _), Contract) ->
     case pm_contract:get_payout_tool(PayoutToolID, Contract) of
         undefined ->
-            raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_not_exists, PayoutToolID}));
+            raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_not_exists, PayoutToolID}), []);
         _ ->
             ok
     end;
@@ -367,9 +232,9 @@ assert_contract_change_applicable(_, _, _) ->
 assert_shop_change_applicable(_, {creation, _}, undefined, _, _) ->
     ok;
 assert_shop_change_applicable(ID, _AnyModification, undefined, _, _) ->
-    raise_invalid_changeset(?invalid_shop(ID, {not_exists, ID}));
+    raise_invalid_changeset(?cm_invalid_shop(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}), []);
 assert_shop_change_applicable(ID, {creation, _}, #domain_Shop{}, _, _) ->
-    raise_invalid_changeset(?invalid_shop(ID, {already_exists, ID}));
+    raise_invalid_changeset(?cm_invalid_shop(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}}), []);
 assert_shop_change_applicable(
     _ID,
     {shop_account_creation, _},
@@ -380,7 +245,7 @@ assert_shop_change_applicable(
     throw(#'InvalidRequest'{errors = [<<"Can't change shop's account">>]});
 assert_shop_change_applicable(
     _ID,
-    {contract_modification, #payproc_ShopContractModification{contract_id = NewContractID}},
+    {contract_modification, #claim_management_ShopContractModification{contract_id = NewContractID}},
     #domain_Shop{contract_id = OldContractID},
     Party,
     Revision
@@ -390,7 +255,7 @@ assert_shop_change_applicable(
         #domain_Contract{} = NewContract ->
             assert_payment_institution_realm_equals(OldContract, NewContract, Revision);
         undefined ->
-            raise_invalid_changeset(?invalid_contract(NewContractID, {not_exists, NewContractID}))
+            raise_invalid_changeset(?cm_invalid_contract(NewContractID, {not_exists, NewContractID}), [])
     end;
 assert_shop_change_applicable(_, _, _, _, _) ->
     ok.
@@ -398,18 +263,25 @@ assert_shop_change_applicable(_, _, _, _, _) ->
 assert_contractor_change_applicable(_, {creation, _}, undefined) ->
     ok;
 assert_contractor_change_applicable(ID, _AnyModification, undefined) ->
-    raise_invalid_changeset(?invalid_contractor(ID, {not_exists, ID}));
+    raise_invalid_changeset(
+        ?cm_invalid_contractor(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}), []
+    );
 assert_contractor_change_applicable(ID, {creation, _}, #domain_PartyContractor{}) ->
-    raise_invalid_changeset(?invalid_contractor(ID, {already_exists, ID}));
+    raise_invalid_changeset(
+        ?cm_invalid_contractor(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}}),
+        []
+    );
 assert_contractor_change_applicable(_, _, _) ->
     ok.
 
 assert_wallet_change_applicable(_, {creation, _}, undefined) ->
     ok;
 assert_wallet_change_applicable(ID, _AnyModification, undefined) ->
-    raise_invalid_changeset(?invalid_wallet(ID, {not_exists, ID}));
+    raise_invalid_changeset(?cm_invalid_wallet(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}), []);
 assert_wallet_change_applicable(ID, {creation, _}, #domain_Wallet{}) ->
-    raise_invalid_changeset(?invalid_wallet(ID, {already_exists, ID}));
+    raise_invalid_changeset(
+        ?cm_invalid_wallet(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}}), []
+    );
 assert_wallet_change_applicable(
     _ID,
     {account_creation, _},
@@ -446,30 +318,44 @@ get_payment_institution_realm(Ref, Revision, ContractID) ->
 ) -> no_return().
 raise_invalid_payment_institution(ContractID, Ref) ->
     raise_invalid_changeset(
-        ?invalid_contract(
+        ?cm_invalid_contract(
             ContractID,
-            {invalid_object_reference, #payproc_InvalidObjectReference{
+            {invalid_object_reference, #claim_management_InvalidObjectReference{
                 ref = make_optional_domain_ref(payment_institution, Ref)
             }}
-        )
+        ),
+        []
     ).
 
--spec raise_invalid_changeset(dmsl_payment_processing_thrift:'InvalidChangesetReason'()) -> no_return().
-raise_invalid_changeset(Reason) ->
-    throw(#payproc_InvalidChangeset{reason = Reason}).
+-spec raise_invalid_changeset(dmsl_claim_management_thrift:'InvalidChangesetReason'(), changeset()) -> no_return().
+raise_invalid_changeset(Reason, InvalidChangeset) ->
+    throw(?cm_invalid_party_changeset(Reason, [{party_modification, C} || C <- InvalidChangeset])).
 
--spec assert_acceptable(claim(), timestamp(), revision(), party()) -> ok | no_return().
-assert_acceptable(Claim, Timestamp, Revision, Party0) ->
-    Changeset = get_changeset(Claim),
+-spec assert_changeset_acceptable(changeset(), timestamp(), revision(), party()) -> ok | no_return().
+assert_changeset_acceptable(Changeset, Timestamp, Revision, Party0) ->
     Effects = make_changeset_safe_effects(Changeset, Timestamp, Revision),
     Party = apply_effects(Effects, Timestamp, Party0),
     pm_party:assert_party_objects_valid(Timestamp, Revision, Party).
 
+-spec make_party_effects(timestamp(), revision(), changeset()) -> effects().
+make_party_effects(Timestamp, Revision, Changeset) ->
+    make_changeset_effects(Changeset, Timestamp, Revision).
+
+make_changeset_effects(Changeset, Timestamp, Revision) ->
+    squash_effects(
+        lists:map(
+            fun(?cm_party_modification(_, _, Change, _)) ->
+                pm_claim_committer_effect:make(Change, Timestamp, Revision)
+            end,
+            Changeset
+        )
+    ).
+
 make_changeset_safe_effects(Changeset, Timestamp, Revision) ->
     squash_effects(
         lists:map(
-            fun(Change) ->
-                pm_claim_effect:make_safe(Change, Timestamp, Revision)
+            fun(?cm_party_modification(_, _, Change, _)) ->
+                pm_claim_committer_effect:make_safe(Change, Timestamp, Revision)
             end,
             Changeset
         )
@@ -498,7 +384,7 @@ squash_contract_effect(?contract_effect(ContractID, Mod) = Effect, Squashed) ->
                 {[?contract_effect(ID, {created, update_contract(Mod, Contract)}) | Acc], true};
             (?contract_effect(ID, {created, _}), {_, true}) when ID =:= ContractID ->
                 % One more created contract with same id - error.
-                raise_invalid_changeset(?invalid_contract(ID, {already_exists, ID}));
+                raise_invalid_changeset(?invalid_contract(ID, {already_exists, ID}), []);
             (E, {Acc, Flag}) ->
                 {[E | Acc], Flag}
         end,
@@ -525,7 +411,7 @@ squash_shop_effect(?shop_effect(ShopID, Mod) = Effect, Squashed) ->
                 {[?shop_effect(ID, {created, update_shop(Mod, Shop)}) | Acc], true};
             (?shop_effect(ID, {created, _}), {_, true}) when ID =:= ShopID ->
                 % One more shop with same id - error.
-                raise_invalid_changeset(?invalid_shop(ID, {already_exists, ID}));
+                raise_invalid_changeset(?invalid_shop(ID, {already_exists, ID}), []);
             (E, {Acc, Flag}) ->
                 {[E | Acc], Flag}
         end,
