@@ -108,11 +108,9 @@ assert_changeset_applicable([], _, _, _) ->
 assert_contract_change_applicable(_, {creation, _}, undefined) ->
     ok;
 assert_contract_change_applicable(ID, {creation, _}, #domain_Contract{}) ->
-    raise_invalid_changeset(
-        ?cm_invalid_contract(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}}), []
-    );
+    raise_invalid_changeset(?cm_invalid_contract_already_exists(ID), []);
 assert_contract_change_applicable(ID, _AnyModification, undefined) ->
-    raise_invalid_changeset(?cm_invalid_contract(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}), []);
+    raise_invalid_changeset(?cm_invalid_contract_not_exists(ID), []);
 assert_contract_change_applicable(ID, ?cm_contract_termination(_), Contract) ->
     case pm_contract:is_active(Contract) of
         true ->
@@ -147,9 +145,9 @@ assert_contract_change_applicable(_, _, _) ->
 assert_shop_change_applicable(_, {creation, _}, undefined, _, _) ->
     ok;
 assert_shop_change_applicable(ID, _AnyModification, undefined, _, _) ->
-    raise_invalid_changeset(?cm_invalid_shop(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}), []);
+    raise_invalid_changeset(?cm_invalid_shop_not_exists(ID), []);
 assert_shop_change_applicable(ID, {creation, _}, #domain_Shop{}, _, _) ->
-    raise_invalid_changeset(?cm_invalid_shop(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}}), []);
+    raise_invalid_changeset(?cm_invalid_shop_already_exists(ID), []);
 assert_shop_change_applicable(
     _ID,
     {shop_account_creation, _},
@@ -170,7 +168,7 @@ assert_shop_change_applicable(
         #domain_Contract{} = NewContract ->
             assert_payment_institution_realm_equals(OldContract, NewContract, Revision);
         undefined ->
-            raise_invalid_changeset(?cm_invalid_contract(NewContractID, {not_exists, NewContractID}), [])
+            raise_invalid_changeset(?cm_invalid_contract_not_exists(NewContractID), [])
     end;
 assert_shop_change_applicable(_, _, _, _, _) ->
     ok.
@@ -178,25 +176,18 @@ assert_shop_change_applicable(_, _, _, _, _) ->
 assert_contractor_change_applicable(_, {creation, _}, undefined) ->
     ok;
 assert_contractor_change_applicable(ID, _AnyModification, undefined) ->
-    raise_invalid_changeset(
-        ?cm_invalid_contractor(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}), []
-    );
+    raise_invalid_changeset(?cm_invalid_contractor_not_exists(ID), []);
 assert_contractor_change_applicable(ID, {creation, _}, #domain_PartyContractor{}) ->
-    raise_invalid_changeset(
-        ?cm_invalid_contractor(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}}),
-        []
-    );
+    raise_invalid_changeset(?cm_invalid_contractor_already_exists(ID), []);
 assert_contractor_change_applicable(_, _, _) ->
     ok.
 
 assert_wallet_change_applicable(_, {creation, _}, undefined) ->
     ok;
 assert_wallet_change_applicable(ID, _AnyModification, undefined) ->
-    raise_invalid_changeset(?cm_invalid_wallet(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}}), []);
+    raise_invalid_changeset(?cm_invalid_wallet_not_exists(ID), []);
 assert_wallet_change_applicable(ID, {creation, _}, #domain_Wallet{}) ->
-    raise_invalid_changeset(
-        ?cm_invalid_wallet(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}}), []
-    );
+    raise_invalid_changeset(?cm_invalid_wallet_already_exists(ID), []);
 assert_wallet_change_applicable(
     _ID,
     {account_creation, _},

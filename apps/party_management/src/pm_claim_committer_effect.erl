@@ -301,7 +301,7 @@ squash_contract_effect(?contract_effect(ContractID, Mod) = Effect, Squashed) ->
         true ->
             lists:reverse(ReversedEffects);
         false ->
-            % Contract creation not found, so this contract created earlier and we shuold just
+            % Contract creation not found, so this contract created earlier and we should just
             % add this claim effect to the end of squashed effects
             lists:reverse([Effect | ReversedEffects])
     end.
