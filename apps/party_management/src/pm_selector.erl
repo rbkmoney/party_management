@@ -27,7 +27,6 @@
     | dmsl_domain_thrift:'CashValueSelector'()
     | dmsl_domain_thrift:'CumulativeLimitSelector'()
     | dmsl_domain_thrift:'TimeSpanSelector'()
-    | dmsl_domain_thrift:'P2PProviderSelector'()
     | dmsl_domain_thrift:'FeeSelector'()
     | dmsl_domain_thrift:'InspectorSelector'().
 
@@ -46,8 +45,7 @@
     flow => instant | {hold, dmsl_domain_thrift:'HoldLifetime'()},
     payout_method => dmsl_domain_thrift:'PayoutMethodRef'(),
     wallet_id => dmsl_domain_thrift:'WalletID'(),
-    identification_level => dmsl_domain_thrift:'ContractorIdentificationLevel'(),
-    p2p_tool => dmsl_domain_thrift:'P2PTool'()
+    identification_level => dmsl_domain_thrift:'ContractorIdentificationLevel'()
 }.
 
 -type predicate() :: dmsl_domain_thrift:'Predicate'().
@@ -164,85 +162,6 @@ reduce_condition(C, VS, Rev) ->
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 
 -spec test() -> _.
-
--spec p2p_provider_test() -> _.
-
-p2p_provider_test() ->
-    BankCardCondition = #domain_BankCardCondition{definition = {issuer_country_is, rus}},
-    BankCardCondition2 = #domain_BankCardCondition{definition = {issuer_country_is, usa}},
-    P2PCondition1 = #domain_P2PToolCondition{
-        sender_is = {bank_card, BankCardCondition},
-        receiver_is = {bank_card, BankCardCondition}
-    },
-    P2PCondition2 = #domain_P2PToolCondition{
-        sender_is = {bank_card, BankCardCondition},
-        receiver_is = {bank_card, BankCardCondition2}
-    },
-    P2PProviderSelector =
-        {decisions, [
-            #domain_P2PProviderDecision{
-                if_ = {condition, {p2p_tool, P2PCondition1}},
-                then_ = {value, [#domain_P2PProviderRef{id = 1}]}
-            },
-            #domain_P2PProviderDecision{
-                if_ = {condition, {p2p_tool, P2PCondition2}},
-                then_ = {value, [#domain_P2PProviderRef{id = 2}]}
-            }
-        ]},
-    BankCard1 = #domain_BankCard{
-        token = <<"TOKEN1">>,
-        payment_system_deprecated = mastercard,
-        bin = <<"888888">>,
-        last_digits = <<"888">>,
-        issuer_country = rus
-    },
-    BankCard2 = #domain_BankCard{
-        token = <<"TOKEN2">>,
-        payment_system_deprecated = mastercard,
-        bin = <<"777777">>,
-        last_digits = <<"777">>,
-        issuer_country = rus
-    },
-    Vs = #{
-        p2p_tool => #domain_P2PTool{
-            sender = {bank_card, BankCard1},
-            receiver = {bank_card, BankCard2}
-        }
-    },
-    ?assertEqual([{domain_P2PProviderRef, 1}], reduce_to_value(P2PProviderSelector, Vs, 1)).
-
--spec p2p_allow_test() -> _.
-p2p_allow_test() ->
-    FunGenCard = fun(PS, Country) ->
-        #domain_BankCard{
-            token = <<"TOKEN1">>,
-            payment_system_deprecated = PS,
-            bin = <<"888888">>,
-            last_digits = <<"888">>,
-            issuer_country = Country
-        }
-    end,
-    FunGenVS = fun(PS1, PS2) ->
-        #{
-            p2p_tool => #domain_P2PTool{
-                sender = {bank_card, FunGenCard(PS1, rus)},
-                receiver = {bank_card, FunGenCard(PS2, rus)}
-            }
-        }
-    end,
-    Condition = #domain_BankCardCondition{definition = {payment_system_is, visa}},
-    CardCondition1 = #domain_P2PToolCondition{
-        sender_is = {bank_card, Condition},
-        receiver_is = {bank_card, Condition}
-    },
-    Predicate = {any_of, [{condition, {p2p_tool, CardCondition1}}]},
-    VS1 = FunGenVS(nspkmir, visa),
-    Allow = reduce_predicate(Predicate, VS1, 1),
-    ?assertEqual({constant, false}, Allow),
-
-    VS2 = FunGenVS(visa, visa),
-    Allow2 = reduce_predicate(Predicate, VS2, 1),
-    ?assertEqual({constant, true}, Allow2).
 
 -spec bin_data_allow_test() -> _.
 bin_data_allow_test() ->

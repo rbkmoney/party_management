@@ -19,6 +19,8 @@
         woody_user_identity,
         payproc_errors,
         erl_health,
+        prometheus,
+        prometheus_cowboy,
         cache
     ]},
     {env, []},

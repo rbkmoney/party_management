@@ -18,7 +18,7 @@ BASE_IMAGE_TAG := ef20e2ec1cb1528e9214bdeb862b15478950d5cd
 
 # Build image tag to be used
 BUILD_IMAGE_NAME := build-erlang
-BUILD_IMAGE_TAG := aaa79c2d6b597f93f5f8b724eecfc31ec2e2a23b
+BUILD_IMAGE_TAG := 117a2e28e18d41d4c3eb76f5d00af117872af5ac
 
 CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze plt_update \
 				release clean distclean format check_format

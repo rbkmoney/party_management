@@ -33,16 +33,6 @@ reduce_provider_terminal_terms(Provider, Terminal, VS, Rev) ->
             ReducedTerms
     end.
 
-reduce_p2p_terms(undefined = Terms, _VS, _Rev) ->
-    Terms;
-reduce_p2p_terms(#domain_P2PProvisionTerms{} = Terms, VS, Rev) ->
-    Terms#domain_P2PProvisionTerms{
-        currencies = reduce_if_defined(Terms#domain_P2PProvisionTerms.currencies, VS, Rev),
-        cash_limit = reduce_if_defined(Terms#domain_P2PProvisionTerms.cash_limit, VS, Rev),
-        cash_flow = reduce_if_defined(Terms#domain_P2PProvisionTerms.cash_flow, VS, Rev),
-        fees = reduce_if_defined(Terms#domain_P2PProvisionTerms.fees, VS, Rev)
-    }.
-
 reduce_withdrawal_terms(undefined = Terms, _VS, _Rev) ->
     Terms;
 reduce_withdrawal_terms(#domain_WithdrawalProvisionTerms{} = Terms, VS, Rev) ->
@@ -171,10 +161,6 @@ reduce_wallet_provision(WalletProvisionTerms, VS, DomainRevision) ->
         withdrawals = pm_maybe:apply(
             fun(X) -> reduce_withdrawal_terms(X, VS, DomainRevision) end,
             WalletProvisionTerms#domain_WalletProvisionTerms.withdrawals
-        ),
-        p2p = pm_maybe:apply(
-            fun(X) -> reduce_p2p_terms(X, VS, DomainRevision) end,
-            WalletProvisionTerms#domain_WalletProvisionTerms.p2p
         )
     }.
 
@@ -243,19 +229,16 @@ merge_payment_terms(ProviderTerms, TerminalTerms) ->
 merge_wallet_terms(
     #domain_WalletProvisionTerms{
         turnover_limit = PLimit,
-        withdrawals = PWithdrawal,
-        p2p = PP2P
+        withdrawals = PWithdrawal
     },
     #domain_WalletProvisionTerms{
         turnover_limit = TLimit,
-        withdrawals = TWithdrawal,
-        p2p = TP2P
+        withdrawals = TWithdrawal
     }
 ) ->
     #domain_WalletProvisionTerms{
         turnover_limit = pm_utils:select_defined(TLimit, PLimit),
-        withdrawals = merge_withdrawal_terms(PWithdrawal, TWithdrawal),
-        p2p = merge_p2p_terms(PP2P, TP2P)
+        withdrawals = merge_withdrawal_terms(PWithdrawal, TWithdrawal)
     };
 merge_wallet_terms(ProviderTerms, TerminalTerms) ->
     pm_utils:select_defined(TerminalTerms, ProviderTerms).
@@ -281,29 +264,6 @@ merge_withdrawal_terms(
         cash_flow = pm_utils:select_defined(TCashflow, PCashflow)
     };
 merge_withdrawal_terms(ProviderTerms, TerminalTerms) ->
-    pm_utils:select_defined(TerminalTerms, ProviderTerms).
-
-merge_p2p_terms(
-    #domain_P2PProvisionTerms{
-        currencies = PCurrencies,
-        cash_limit = PLimit,
-        cash_flow = PCashflow,
-        fees = PFees
-    },
-    #domain_P2PProvisionTerms{
-        currencies = TCurrencies,
-        cash_limit = TLimit,
-        cash_flow = TCashflow,
-        fees = TFees
-    }
-) ->
-    #domain_P2PProvisionTerms{
-        currencies = pm_utils:select_defined(TCurrencies, PCurrencies),
-        cash_limit = pm_utils:select_defined(TLimit, PLimit),
-        cash_flow = pm_utils:select_defined(TCashflow, PCashflow),
-        fees = pm_utils:select_defined(TFees, PFees)
-    };
-merge_p2p_terms(ProviderTerms, TerminalTerms) ->
     pm_utils:select_defined(TerminalTerms, ProviderTerms).
 
 reduce_if_defined(Selector, VS, Rev) ->
