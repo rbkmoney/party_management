@@ -267,7 +267,7 @@ handle_call('Commit', {_PartyID, Claim}, AuxSt, St) ->
     PartyChangeset = pm_claim_committer:filter_party_changes(Changeset),
     ok = pm_claim_committer:assert_changeset_acceptable(PartyChangeset, Timestamp, DomainRevision, Party),
     Effects = pm_claim_committer_effect:make_changeset_effects(PartyChangeset, Timestamp, DomainRevision),
-    PartyClaim = pm_claim_converter:new_party_claim(ID, Revision, CreatedAt, UpdatedAt, PartyChangeset),
+    PartyClaim = pm_claim_committer_converter:new_party_claim(ID, Revision, CreatedAt, UpdatedAt, PartyChangeset),
     AcceptedPartyClaim = set_status(?accepted(Effects), get_next_revision(PartyClaim), Timestamp, PartyClaim),
     PartyRevision = get_next_party_revision(St),
     respond(

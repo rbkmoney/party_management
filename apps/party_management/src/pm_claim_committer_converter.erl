@@ -14,7 +14,7 @@
 %%% limitations under the License.
 %%%
 
--module(pm_claim_converter).
+-module(pm_claim_committer_converter).
 
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 -include_lib("damsel/include/dmsl_claim_management_thrift.hrl").
