@@ -393,9 +393,10 @@ contractor_already_exists(C) ->
     ContractorParams = pm_ct_helper:make_battle_ready_contractor(),
     PartyID = cfg(party_id, C),
     ContractorID = ?REAL_CONTRACTOR_ID1,
-    Modifications = [?cm_contractor_creation(ContractorID, ContractorParams)],
-    Claim = claim(Modifications, PartyID),
-    {exception, ?cm_invalid_party_changeset(?cm_invalid_contractor_already_exists(ContractorID), [])} =
+    Mod = ?cm_contractor_creation(ContractorID, ContractorParams),
+    Claim = claim([Mod], PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(?cm_invalid_contractor_already_exists(ContractorID), [{party_modification, Mod}])} =
         accept_claim(Claim, C).
 
 -spec contract_already_exists(config()) -> _.
@@ -403,9 +404,10 @@ contract_already_exists(C) ->
     PartyID = cfg(party_id, C),
     ContractParams = make_contract_params(?REAL_CONTRACTOR_ID1),
     ContractID = ?REAL_CONTRACT_ID1,
-    Modifications = [?cm_contract_creation(ContractID, ContractParams)],
-    Claim = claim(Modifications, PartyID),
-    {exception, ?cm_invalid_party_changeset(?cm_invalid_contract_already_exists(ContractID), [])} =
+    Mod = ?cm_contract_creation(ContractID, ContractParams),
+    Claim = claim([Mod], PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(?cm_invalid_contract_already_exists(ContractID), [{party_modification, Mod}])} =
         accept_claim(Claim, C).
 
 -spec contract_already_terminated(config()) -> _.
@@ -413,9 +415,12 @@ contract_already_terminated(C) ->
     ContractID = ?REAL_CONTRACT_ID1,
     PartyID = cfg(party_id, C),
     Reason = #claim_management_ContractTermination{reason = <<"Because!">>},
-    Modifications = [?cm_contract_modification(ContractID, {termination, Reason})],
-    Claim = claim(Modifications, PartyID),
-    {exception, ?cm_invalid_party_changeset(?cm_invalid_contract_invalid_status_terminated(ContractID, _), [])} =
+    Mod = ?cm_contract_modification(ContractID, {termination, Reason}),
+    Claim = claim([Mod], PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(?cm_invalid_contract_invalid_status_terminated(ContractID, _), [
+            {party_modification, Mod}
+        ])} =
         accept_claim(Claim, C).
 
 -spec shop_already_exists(config()) -> _.
@@ -434,13 +439,15 @@ shop_already_exists(C) ->
         payout_tool_id = ?REAL_PAYOUT_TOOL_ID1
     },
     ScheduleParams = #claim_management_ScheduleModification{schedule = ?bussched(1)},
+    Mod = ?cm_shop_modification(ShopID, {creation, ShopParams}),
+
     Modifications = [
-        ?cm_shop_creation(ShopID, ShopParams),
+        Mod,
         ?cm_shop_account_creation(ShopID, ?cur(<<"RUB">>)),
         ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
     ],
     Claim = claim(Modifications, PartyID),
-    {exception, ?cm_invalid_party_changeset(?cm_invalid_shop_already_exists(ShopID), [])} =
+    {exception, ?cm_invalid_party_changeset(?cm_invalid_shop_already_exists(ShopID), [{party_modification, Mod}])} =
         accept_claim(Claim, C).
 
 %%% Internal functions
