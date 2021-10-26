@@ -17,6 +17,7 @@
 -export([is_active/1]).
 -export([is_live/2]).
 
+-export([get_id/1]).
 %%
 
 -type contract() :: dmsl_domain_thrift:'Contract'().
@@ -198,6 +199,10 @@ is_live(Contract, Revision) ->
     PaymentInstitutionRef = Contract#domain_Contract.payment_institution,
     PaymentInstitution = get_payment_institution(PaymentInstitutionRef, Revision),
     pm_payment_institution:is_live(PaymentInstitution).
+
+-spec get_id(contract()) -> contract_id().
+get_id(#domain_Contract{id = ContractID}) ->
+    ContractID.
 
 %% Internals
 

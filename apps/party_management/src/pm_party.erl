@@ -246,9 +246,6 @@ wallet_suspension(ID, Suspension, Party) ->
 
 %% Internals
 
-get_contract_id(#domain_Contract{id = ContractID}) ->
-    ContractID.
-
 ensure_shop(#domain_Shop{} = Shop) ->
     Shop;
 ensure_shop(undefined) ->
@@ -492,12 +489,12 @@ assert_shop_contract_valid(
     Terms = get_terms(Contract, Timestamp, Revision),
     case ShopAccount of
         #domain_ShopAccount{currency = CurrencyRef} ->
-            _ = assert_currency_valid({shop, ID}, get_contract_id(Contract), CurrencyRef, Terms, Revision);
+            _ = assert_currency_valid({shop, ID}, pm_contract:get_id(Contract), CurrencyRef, Terms, Revision);
         undefined ->
             % TODO remove cross-deps between claim-party-contract
             pm_claim:raise_invalid_changeset(?invalid_shop(ID, {no_account, ID}))
     end,
-    _ = assert_category_valid({shop, ID}, get_contract_id(Contract), CategoryRef, Terms, Revision),
+    _ = assert_category_valid({shop, ID}, pm_contract:get_id(Contract), CategoryRef, Terms, Revision),
     ok.
 
 assert_shop_payout_tool_valid(#domain_Shop{payout_tool_id = undefined, payout_schedule = undefined}, _) ->
@@ -541,7 +538,7 @@ assert_wallet_contract_valid(#domain_Wallet{id = ID, account = Account}, Contrac
     case Account of
         #domain_WalletAccount{currency = CurrencyRef} ->
             Terms = get_terms(Contract, Timestamp, Revision),
-            _ = assert_currency_valid({wallet, ID}, get_contract_id(Contract), CurrencyRef, Terms, Revision),
+            _ = assert_currency_valid({wallet, ID}, pm_contract:get_id(Contract), CurrencyRef, Terms, Revision),
             ok;
         undefined ->
             pm_claim:raise_invalid_changeset(?invalid_wallet(ID, {no_account, ID}))

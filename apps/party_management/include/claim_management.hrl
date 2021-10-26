@@ -179,12 +179,60 @@
     {invalid_shop, #claim_management_InvalidShop{id = ID, reason = Reason}}
 ).
 
+-define(cm_invalid_shop_account_not_exists(ID),
+    ?cm_invalid_shop(ID, {account_not_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
 -define(cm_invalid_shop_not_exists(ID),
     ?cm_invalid_shop(ID, {not_exists, #claim_management_InvalidClaimConcreteReason{}})
 ).
 
 -define(cm_invalid_shop_already_exists(ID),
     ?cm_invalid_shop(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
+-define(cm_invalid_shop_contract_terms_violated(ID, ContractID, Terms),
+    ?cm_invalid_shop(
+        ID,
+        {contract_terms_violated, #claim_management_ContractTermsViolated{
+            contract_id = ContractID,
+            terms = Terms
+        }}
+    )
+).
+
+-define(cm_invalid_shop_payout_tool(ID, Reason),
+    ?cm_invalid_shop(ID, {payout_tool_invalid, Reason})
+).
+
+-define(cm_invalid_shop_payout_tool_not_set_for_payouts(ID, Schedule),
+    ?cm_invalid_shop_payout_tool(
+        ID,
+        {not_set_for_payouts, #claim_management_PayoutToolNotSetForPayouts{
+            payout_schedule = Schedule
+        }}
+    )
+).
+
+-define(cm_invalid_shop_payout_tool_currency_mismatch(ID, PayoutToolID, ShopAccountCurrency, PayoutToolCurrency),
+    ?cm_invalid_shop_payout_tool(
+        ID,
+        {currency_mismatch, #claim_management_PayoutToolCurrencyMismatch{
+            shop_account_currency = ShopAccountCurrency,
+            payout_tool_id = PayoutToolID,
+            payout_tool_currency = PayoutToolCurrency
+        }}
+    )
+).
+
+-define(cm_invalid_shop_payout_tool_not_in_contract(ID, ContractID, PayoutToolID),
+    ?cm_invalid_shop_payout_tool(
+        ID,
+        {not_in_contract, #claim_management_PayoutToolNotInContract{
+            contract_id = ContractID,
+            payout_tool_id = PayoutToolID
+        }}
+    )
 ).
 
 -define(cm_invalid_contract(ID, Reason),
@@ -201,6 +249,10 @@
 
 -define(cm_invalid_contract_invalid_status_terminated(ID, T),
     ?cm_invalid_contract(ID, {invalid_status, {terminated, #domain_ContractTerminated{terminated_at = T}}})
+).
+
+-define(cm_invalid_contract_contractor_not_exists(ID, ContractorID),
+    ?cm_invalid_contract(ID, {contractor_not_exists, #claim_management_ContractorNotExists{id = ContractorID}})
 ).
 
 -define(cm_invalid_contractor(ID, Reason),
@@ -225,6 +277,20 @@
 
 -define(cm_invalid_wallet_already_exists(ID),
     ?cm_invalid_wallet(ID, {already_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
+-define(cm_invalid_wallet_account_not_exists(ID),
+    ?cm_invalid_wallet(ID, {account_not_exists, #claim_management_InvalidClaimConcreteReason{}})
+).
+
+-define(cm_invalid_wallet_contract_terms_violated(ID, ContractID, Terms),
+    ?cm_invalid_wallet(
+        ID,
+        {contract_terms_violated, #claim_management_ContractTermsViolated{
+            contract_id = ContractID,
+            terms = Terms
+        }}
+    )
 ).
 
 -endif.
