@@ -28,6 +28,8 @@
 -export([contract_already_exists/1]).
 -export([contract_already_terminated/1]).
 -export([shop_already_exists/1]).
+-export([invalid_shop_payout_tool_not_in_contract/1]).
+-export([invalid_shop_payout_tool_currency_mismatch/1]).
 
 -type config() :: pm_ct_helper:config().
 -type test_case_name() :: pm_ct_helper:test_case_name().
@@ -38,7 +40,9 @@
 -define(REAL_CONTRACT_ID2, <<"CONTRACT3">>).
 -define(REAL_PAYOUT_TOOL_ID1, <<"PAYOUTTOOL2">>).
 -define(REAL_PAYOUT_TOOL_ID2, <<"PAYOUTTOOL3">>).
+-define(REAL_PAYOUT_TOOL_ID4, <<"PAYOUTTOOL4">>).
 -define(REAL_SHOP_ID, <<"SHOP2">>).
+-define(REAL_SHOP_ID4, <<"SHOP4">>).
 
 %%% CT
 
@@ -63,7 +67,9 @@ all() ->
         contractor_already_exists,
         contract_already_exists,
         contract_already_terminated,
-        shop_already_exists
+        shop_already_exists,
+        invalid_shop_payout_tool_not_in_contract,
+        invalid_shop_payout_tool_currency_mismatch
     ].
 
 -spec init_per_suite(config()) -> config().
@@ -353,6 +359,73 @@ invalid_cash_register_modification(C) ->
     Modifications = [?cm_shop_modification(?REAL_SHOP_ID, {details_modification, NewDetails}), Mod],
     Claim = claim(Modifications, PartyID),
     {exception, ?cm_invalid_party_changeset(?cm_invalid_shop_not_exists(AnotherShopID), [{party_modification, Mod}])} =
+        accept_claim(Claim, C).
+
+-spec invalid_shop_payout_tool_not_in_contract(config()) -> _.
+invalid_shop_payout_tool_not_in_contract(C) ->
+    PartyID = cfg(party_id, C),
+    Details = #domain_ShopDetails{
+        name = <<"SOME SHOP NAME">>,
+        description = <<"Very meaningfull description of the shop.">>
+    },
+    Category = ?cat(2),
+    Location = {url, <<"https://example.com">>},
+    ContractID = ?REAL_CONTRACT_ID1,
+    ShopID = ?REAL_SHOP_ID4,
+    ShopParams = #claim_management_ShopParams{
+        category = Category,
+        location = Location,
+        details = Details,
+        contract_id = ContractID,
+        payout_tool_id = ?REAL_PAYOUT_TOOL_ID1
+    },
+    Schedule = ?bussched(1),
+    ScheduleParams = #claim_management_ScheduleModification{schedule = Schedule},
+    Modifications = [
+        ?cm_shop_creation(ShopID, ShopParams),
+        ?cm_shop_account_creation(ShopID, ?cur(<<"USD">>)),
+        ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
+    ],
+    Claim = claim(Modifications, PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(
+            ?cm_invalid_shop_payout_tool_currency_mismatch(
+                ShopID, ?REAL_PAYOUT_TOOL_ID1, ?cur(<<"USD">>), ?cur(<<"RUB">>)
+            ),
+            _
+        )} =
+        accept_claim(Claim, C).
+
+-spec invalid_shop_payout_tool_currency_mismatch(config()) -> _.
+invalid_shop_payout_tool_currency_mismatch(C) ->
+    PartyID = cfg(party_id, C),
+    Details = #domain_ShopDetails{
+        name = <<"SOME SHOP NAME">>,
+        description = <<"Very meaningfull description of the shop.">>
+    },
+    Category = ?cat(2),
+    Location = {url, <<"https://example.com">>},
+    ContractID = ?REAL_CONTRACT_ID1,
+    ShopID = ?REAL_SHOP_ID4,
+    ShopParams = #claim_management_ShopParams{
+        category = Category,
+        location = Location,
+        details = Details,
+        contract_id = ContractID,
+        payout_tool_id = ?REAL_PAYOUT_TOOL_ID4
+    },
+    Schedule = ?bussched(1),
+    ScheduleParams = #claim_management_ScheduleModification{schedule = Schedule},
+    Modifications = [
+        ?cm_shop_creation(ShopID, ShopParams),
+        ?cm_shop_account_creation(ShopID, ?cur(<<"RUB">>)),
+        ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
+    ],
+    Claim = claim(Modifications, PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(
+            ?cm_invalid_shop_payout_tool_not_in_contract(ShopID, ContractID, ?REAL_PAYOUT_TOOL_ID4), _
+        )} =
         accept_claim(Claim, C).
 
 -spec shop_contract_modification(config()) -> _.

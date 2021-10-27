@@ -246,13 +246,26 @@ raise_invalid_payment_institution(ContractID, Ref, PartyChange) ->
         [PartyChange]
     ).
 
+-spec extract_party_modification_changes(changeset()) -> [change()].
+extract_party_modification_changes(Changeset) ->
+    lists:filtermap(
+        fun
+            (?cm_party_modification(_, _, Change, _)) ->
+                {true, Change};
+            (?cm_modification_unit(_, _, _, _)) ->
+                false
+        end,
+        Changeset
+    ).
+
 -spec assert_changeset_acceptable(changeset(), timestamp(), revision(), party()) -> ok | no_return().
 assert_changeset_acceptable(Changeset, Timestamp, Revision, Party0) ->
     Effects = pm_claim_committer_effect:make_changeset_safe_effects(Changeset, Timestamp, Revision),
     Party = pm_claim_committer_effect:apply_effects(Effects, Timestamp, Party0),
-    _ = assert_contracts_valid(Timestamp, Revision, Party, Changeset),
-    _ = assert_shops_valid(Timestamp, Revision, Party, Changeset),
-    _ = assert_wallets_valid(Timestamp, Revision, Party, Changeset),
+    PartyModificationChanges = extract_party_modification_changes(Changeset),
+    _ = assert_contracts_valid(Timestamp, Revision, Party, PartyModificationChanges),
+    _ = assert_shops_valid(Timestamp, Revision, Party, PartyModificationChanges),
+    _ = assert_wallets_valid(Timestamp, Revision, Party, PartyModificationChanges),
     ok.
 
 assert_contracts_valid(_Timestamp, _Revision, Party, Changeset) ->
