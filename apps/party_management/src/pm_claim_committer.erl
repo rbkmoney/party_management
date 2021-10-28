@@ -86,7 +86,12 @@ get_shop_modifications_shop_ids(Changeset) ->
     ).
 
 -spec assert_modifications_applicable(modifications(), timestamp(), revision(), party()) -> ok | no_return().
-assert_modifications_applicable([?cm_shop_cash_register_modification_unit(_, _) | Others], Timestamp, Revision, Party) ->
+assert_modifications_applicable(
+    [?cm_shop_cash_register_modification_unit(_, _) | Others],
+    Timestamp,
+    Revision,
+    Party
+) ->
     assert_modifications_applicable(Others, Timestamp, Revision, Party);
 assert_modifications_applicable([PartyChange | Others], Timestamp, Revision, Party) ->
     case PartyChange of
@@ -141,7 +146,12 @@ assert_contract_modification_applicable(ID, ?cm_payout_tool_creation(PayoutToolI
         _ ->
             raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_already_exists, PayoutToolID}), [PartyChange])
     end;
-assert_contract_modification_applicable(ID, ?cm_payout_tool_info_modification(PayoutToolID, _), Contract, PartyChange) ->
+assert_contract_modification_applicable(
+    ID,
+    ?cm_payout_tool_info_modification(PayoutToolID, _),
+    Contract,
+    PartyChange
+) ->
     case pm_contract:get_payout_tool(PayoutToolID, Contract) of
         undefined ->
             raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_not_exists, PayoutToolID}), [PartyChange]);

@@ -173,7 +173,13 @@ assert_wallet_valid(#domain_Wallet{contract = ContractID} = Wallet, Timestamp, R
             pm_claim_committer:raise_invalid_changeset(?cm_invalid_contract_not_exists(ContractID), Modifications)
     end.
 
-assert_wallet_contract_valid(#domain_Wallet{id = ID, account = Account}, Contract, Timestamp, Revision, Modifications) ->
+assert_wallet_contract_valid(
+    #domain_Wallet{id = ID, account = Account},
+    Contract,
+    Timestamp,
+    Revision,
+    Modifications
+) ->
     case Account of
         #domain_WalletAccount{currency = CurrencyRef} ->
             Terms = pm_party:get_terms(Contract, Timestamp, Revision),
