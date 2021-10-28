@@ -18,15 +18,15 @@
 
 %% Interface
 
--type change() :: dmsl_claim_management_thrift:'PartyModification'().
+-type modification() :: pm_claim_committer:modification().
+-type modifications() :: pm_claim_committer:modifications().
 -type effect() :: dmsl_payment_processing_thrift:'ClaimEffect'().
 -type timestamp() :: pm_datetime:timestamp().
 -type revision() :: pm_domain:revision().
 -type party() :: pm_party:party().
 -type effects() :: dmsl_payment_processing_thrift:'ClaimEffects'().
--type changeset() :: dmsl_claim_management_thrift:'ClaimChangeset'().
 
--spec make(change(), timestamp(), revision()) -> effect() | no_return().
+-spec make(modification(), timestamp(), revision()) -> effect() | no_return().
 make(?cm_contractor_modification(ID, Modification), Timestamp, Revision) ->
     ?contractor_effect(ID, make_contractor_effect(ID, Modification, Timestamp, Revision));
 make(?cm_contract_modification(ID, Modification), Timestamp, Revision) ->
@@ -45,12 +45,8 @@ make(?cm_wallet_modification(ID, Modification), Timestamp, _Revision) ->
 
 %% NOTE Заглушка для пропуска фазы создания счетов для магазинов и кошельков на этапе проверки (Accept)
 %% TODO Придумать имя получше/отрефакторить
--spec make_safe(change(), timestamp(), revision()) -> effect() | no_return().
-make_safe(
-    ?cm_shop_modification(ID, {shop_account_creation, #claim_management_ShopAccountParams{currency = Currency}}),
-    _Timestamp,
-    _Revision
-) ->
+-spec make_safe(modification(), timestamp(), revision()) -> effect() | no_return().
+make_safe(?cm_shop_account_creation(ID, Currency), _Timestamp, _Revision) ->
     ?shop_effect(
         ID,
         {account_created, #domain_ShopAccount{
@@ -60,8 +56,15 @@ make_safe(
             payout = 0
         }}
     );
-make_safe(?cm_wallet_modification(ID, {account_creation, Params}), _, _) ->
-    ?wallet_effect(ID, {account_created, pm_wallet:create_fake_account(Params)});
+make_safe(?cm_wallet_account_creation(ID, Currency), _, _) ->
+    ?wallet_effect(
+        ID,
+        {account_created, #domain_WalletAccount{
+            currency = Currency,
+            settlement = 0,
+            payout = 0
+        }}
+    );
 make_safe(Change, Timestamp, Revision) ->
     make(Change, Timestamp, Revision).
 
@@ -343,24 +346,24 @@ apply_effects(Effects, Timestamp, Party) ->
         Effects
     ).
 
--spec make_changeset_effects(changeset(), timestamp(), revision()) -> effects().
-make_changeset_effects(Changeset, Timestamp, Revision) ->
+-spec make_changeset_effects(modifications(), timestamp(), revision()) -> effects().
+make_changeset_effects(Changes, Timestamp, Revision) ->
     pm_claim_committer_effect:squash_effects(
         lists:map(
-            fun(?cm_party_modification(_, _, Change, _)) ->
+            fun(Change) ->
                 pm_claim_committer_effect:make(Change, Timestamp, Revision)
             end,
-            Changeset
+            Changes
         )
     ).
 
--spec make_changeset_safe_effects(changeset(), timestamp(), revision()) -> effects().
-make_changeset_safe_effects(Changeset, Timestamp, Revision) ->
+-spec make_changeset_safe_effects(modifications(), timestamp(), revision()) -> effects().
+make_changeset_safe_effects(Changes, Timestamp, Revision) ->
     pm_claim_committer_effect:squash_effects(
         lists:map(
-            fun(?cm_party_modification(_, _, Change, _)) ->
+            fun(Change) ->
                 pm_claim_committer_effect:make_safe(Change, Timestamp, Revision)
             end,
-            Changeset
+            Changes
         )
     ).

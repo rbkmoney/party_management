@@ -26,28 +26,28 @@
 -export([new_party_claim/5]).
 
 -type payproc_claim() :: dmsl_payment_processing_thrift:'Claim'().
--type changeset() :: dmsl_claim_management_thrift:'ClaimChangeset'().
 -type timestamp() :: pm_datetime:timestamp().
 -type revision() :: pm_domain:revision().
 -type claim_id() :: dmsl_claim_management_thrift:'ClaimID'().
+-type changes() :: pm_claim_committer:modifications().
 
--spec new_party_claim(claim_id(), revision(), timestamp(), timestamp(), changeset()) -> payproc_claim().
-new_party_claim(ID, Revision, CreatedAt, UpdatedAt, Changeset) ->
+-spec new_party_claim(claim_id(), revision(), timestamp(), timestamp(), changes()) -> payproc_claim().
+new_party_claim(ID, Revision, CreatedAt, UpdatedAt, Changes) ->
     #payproc_Claim{
         id = ID,
         status = ?pending(),
-        changeset = to_party_changeset(Changeset),
+        changeset = to_party_changeset(Changes),
         revision = Revision,
         created_at = CreatedAt,
         updated_at = UpdatedAt
     }.
 
-to_party_changeset(Changeset) ->
+to_party_changeset(Changes) ->
     lists:map(
-        fun(?cm_party_modification(_, _, PartyMod, _)) ->
+        fun(PartyMod) ->
             to_payproc_party_modification(PartyMod)
         end,
-        Changeset
+        Changes
     ).
 
 to_payproc_party_modification(?cm_contractor_modification(ContractorID, ContractorModification)) ->

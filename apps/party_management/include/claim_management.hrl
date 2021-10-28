@@ -144,6 +144,20 @@
     {wallet_modification, #claim_management_WalletModificationUnit{id = ID, modification = Modification}}
 ).
 
+-define(cm_wallet_account_creation_params(CurrencyRef),
+    {account_creation, #claim_management_WalletAccountParams{
+        currency = CurrencyRef
+    }}
+).
+
+-define(cm_wallet_account_creation(WalletID, CurrencyRef),
+    ?cm_wallet_modification(
+        WalletID,
+        ?cm_wallet_account_creation_params(CurrencyRef)
+    )
+).
+
+%%% Claim Committer statuses
 -define(cm_pending(),
     {pending, #claim_management_ClaimPending{}}
 ).

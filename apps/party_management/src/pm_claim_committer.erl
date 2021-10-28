@@ -6,7 +6,7 @@
 -include("claim_management.hrl").
 -include("party_events.hrl").
 
--export([filter_party_changes/1]).
+-export([filter_party_modifications/1]).
 -export([assert_cash_register_modifications_applicable/2]).
 -export([assert_changeset_applicable/4]).
 -export([assert_changeset_acceptable/4]).
@@ -16,19 +16,23 @@
 -type changeset() :: dmsl_claim_management_thrift:'ClaimChangeset'().
 -type timestamp() :: pm_datetime:timestamp().
 -type revision() :: pm_domain:revision().
--type change() :: dmsl_claim_management_thrift:'ModificationUnit'().
+-type modification() :: dmsl_claim_management_thrift:'PartyModification'().
+-type modifications() :: [modification()].
 -type shop_id() :: dmsl_domain_thrift:'ShopID'().
 -type wallet_id() :: dmsl_domain_thrift:'WalletID'().
 -type contract_id() :: dmsl_domain_thrift:'ContractID'().
 
--spec filter_party_changes(changeset()) -> changeset().
-filter_party_changes(Changeset) ->
+-export_type([modification/0]).
+-export_type([modifications/0]).
+
+-spec filter_party_modifications(changeset()) -> modifications().
+filter_party_modifications(Changeset) ->
     lists:filtermap(
         fun
             (?cm_party_modification(_, _, ?cm_shop_cash_register_modification_unit(_, _), _)) ->
                 false;
-            (?cm_party_modification(_, _, _, _)) ->
-                true;
+            (?cm_party_modification(_, _, Change, _)) ->
+                {true, Change};
             (?cm_modification_unit(_, _, _, _)) ->
                 false
         end,
@@ -86,8 +90,8 @@ get_shop_modifications_shop_ids(Changeset) ->
         )
     ).
 
--spec assert_changeset_applicable(changeset(), timestamp(), revision(), party()) -> ok | no_return().
-assert_changeset_applicable([?cm_party_modification(_, _, PartyChange, _) | Others], Timestamp, Revision, Party) ->
+-spec assert_changeset_applicable(modifications(), timestamp(), revision(), party()) -> ok | no_return().
+assert_changeset_applicable([PartyChange | Others], Timestamp, Revision, Party) ->
     case PartyChange of
         ?cm_contract_modification(ID, Modification) ->
             Contract = pm_party:get_contract(ID, Party),
@@ -233,7 +237,7 @@ get_payment_institution_realm(Ref, Revision, ContractID, PartyChange) ->
 -spec raise_invalid_payment_institution(
     dmsl_domain_thrift:'ContractID'(),
     dmsl_domain_thrift:'PaymentInstitutionRef'() | undefined,
-    change()
+    modification()
 ) -> no_return().
 raise_invalid_payment_institution(ContractID, Ref, PartyChange) ->
     raise_invalid_changeset(
@@ -246,26 +250,13 @@ raise_invalid_payment_institution(ContractID, Ref, PartyChange) ->
         [PartyChange]
     ).
 
--spec extract_party_modification_changes(changeset()) -> [change()].
-extract_party_modification_changes(Changeset) ->
-    lists:filtermap(
-        fun
-            (?cm_party_modification(_, _, Change, _)) ->
-                {true, Change};
-            (?cm_modification_unit(_, _, _, _)) ->
-                false
-        end,
-        Changeset
-    ).
-
--spec assert_changeset_acceptable(changeset(), timestamp(), revision(), party()) -> ok | no_return().
-assert_changeset_acceptable(Changeset, Timestamp, Revision, Party0) ->
-    Effects = pm_claim_committer_effect:make_changeset_safe_effects(Changeset, Timestamp, Revision),
+-spec assert_changeset_acceptable(modifications(), timestamp(), revision(), party()) -> ok | no_return().
+assert_changeset_acceptable(Changes, Timestamp, Revision, Party0) ->
+    Effects = pm_claim_committer_effect:make_changeset_safe_effects(Changes, Timestamp, Revision),
     Party = pm_claim_committer_effect:apply_effects(Effects, Timestamp, Party0),
-    PartyModificationChanges = extract_party_modification_changes(Changeset),
-    _ = assert_contracts_valid(Timestamp, Revision, Party, PartyModificationChanges),
-    _ = assert_shops_valid(Timestamp, Revision, Party, PartyModificationChanges),
-    _ = assert_wallets_valid(Timestamp, Revision, Party, PartyModificationChanges),
+    _ = assert_contracts_valid(Timestamp, Revision, Party, Changes),
+    _ = assert_shops_valid(Timestamp, Revision, Party, Changes),
+    _ = assert_wallets_valid(Timestamp, Revision, Party, Changes),
     ok.
 
 assert_contracts_valid(_Timestamp, _Revision, Party, Changeset) ->
