@@ -238,15 +238,14 @@ handle_call('RevokeClaim', {_, _PartyID, ID, ClaimRevision, Reason}, AuxSt, St) 
     );
 %% ClaimCommitter
 
-handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
-    #claim_management_Claim{changeset = Changeset} = Claim,
+handle_call('Accept', {_PartyID, #claim_management_Claim{changeset = Changeset}}, AuxSt, St) ->
     Party = get_st_party(St),
     Timestamp = pm_datetime:format_now(),
     Revision = pm_domain:head(),
-    ok = pm_claim_committer:assert_cash_register_modifications_applicable(Changeset, Party),
-    PartyChanges = pm_claim_committer:filter_party_modifications(Changeset),
-    ok = pm_claim_committer:assert_changeset_applicable(PartyChanges, Timestamp, Revision, Party),
-    ok = pm_claim_committer:assert_changeset_acceptable(PartyChanges, Timestamp, Revision, Party),
+    Modifications = pm_claim_committer:filter_party_modifications(Changeset),
+    ok = pm_claim_committer:assert_cash_register_modifications_applicable(Modifications, Party),
+    ok = pm_claim_committer:assert_modifications_applicable(Modifications, Timestamp, Revision, Party),
+    ok = pm_claim_committer:assert_modifications_acceptable(Modifications, Timestamp, Revision, Party),
     respond(
         ok,
         [],
@@ -264,10 +263,10 @@ handle_call('Commit', {_PartyID, Claim}, AuxSt, St) ->
     Party = get_st_party(St),
     Timestamp = pm_datetime:format_now(),
     DomainRevision = pm_domain:head(),
-    PartyChanges = pm_claim_committer:filter_party_modifications(Changeset),
-    ok = pm_claim_committer:assert_changeset_acceptable(PartyChanges, Timestamp, DomainRevision, Party),
-    Effects = pm_claim_committer_effect:make_changeset_effects(PartyChanges, Timestamp, DomainRevision),
-    PartyClaim = pm_claim_committer_converter:new_party_claim(ID, Revision, CreatedAt, UpdatedAt, PartyChanges),
+    Modifications = pm_claim_committer:filter_party_modifications(Changeset),
+    ok = pm_claim_committer:assert_modifications_acceptable(Modifications, Timestamp, DomainRevision, Party),
+    Effects = pm_claim_committer_effect:make_modifications_effects(Modifications, Timestamp, DomainRevision),
+    PartyClaim = pm_claim_committer_converter:new_party_claim(ID, Revision, CreatedAt, UpdatedAt, Modifications),
     AcceptedPartyClaim = set_status(?accepted(Effects), get_next_revision(PartyClaim), Timestamp, PartyClaim),
     PartyRevision = get_next_party_revision(St),
     respond(

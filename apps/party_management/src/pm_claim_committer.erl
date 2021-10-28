@@ -8,8 +8,8 @@
 
 -export([filter_party_modifications/1]).
 -export([assert_cash_register_modifications_applicable/2]).
--export([assert_changeset_applicable/4]).
--export([assert_changeset_acceptable/4]).
+-export([assert_modifications_applicable/4]).
+-export([assert_modifications_acceptable/4]).
 -export([raise_invalid_changeset/2]).
 
 -type party() :: pm_party:party().
@@ -29,8 +29,6 @@
 filter_party_modifications(Changeset) ->
     lists:filtermap(
         fun
-            (?cm_party_modification(_, _, ?cm_shop_cash_register_modification_unit(_, _), _)) ->
-                false;
             (?cm_party_modification(_, _, Change, _)) ->
                 {true, Change};
             (?cm_modification_unit(_, _, _, _)) ->
@@ -39,11 +37,11 @@ filter_party_modifications(Changeset) ->
         Changeset
     ).
 
--spec assert_cash_register_modifications_applicable(changeset(), party()) -> ok | no_return().
-assert_cash_register_modifications_applicable(Changeset, Party) ->
-    MappedChanges = get_cash_register_modifications_map(Changeset),
+-spec assert_cash_register_modifications_applicable(modifications(), party()) -> ok | no_return().
+assert_cash_register_modifications_applicable(Modifications, Party) ->
+    MappedChanges = get_cash_register_modifications_map(Modifications),
     CashRegisterShopIDs = sets:from_list(maps:keys(MappedChanges)),
-    ShopIDs = get_all_valid_shop_ids(Changeset, Party),
+    ShopIDs = get_all_valid_shop_ids(Modifications, Party),
     case sets:is_subset(CashRegisterShopIDs, ShopIDs) of
         true ->
             ok;
@@ -63,16 +61,16 @@ get_all_valid_shop_ids(Changeset, Party) ->
 get_party_shop_ids(Party) ->
     sets:from_list(maps:keys(pm_party:get_shops(Party))).
 
-get_cash_register_modifications_map(Changeset) ->
+get_cash_register_modifications_map(Modifications) ->
     lists:foldl(
         fun
-            (?cm_party_modification(_, _, C = ?cm_shop_cash_register_modification_unit(ShopID, _), _), Acc) ->
+            (C = ?cm_shop_cash_register_modification_unit(ShopID, _), Acc) ->
                 Acc#{ShopID => C};
             (_, Acc) ->
                 Acc
         end,
         #{},
-        Changeset
+        Modifications
     ).
 
 get_shop_modifications_shop_ids(Changeset) ->
@@ -90,36 +88,38 @@ get_shop_modifications_shop_ids(Changeset) ->
         )
     ).
 
--spec assert_changeset_applicable(modifications(), timestamp(), revision(), party()) -> ok | no_return().
-assert_changeset_applicable([PartyChange | Others], Timestamp, Revision, Party) ->
+-spec assert_modifications_applicable(modifications(), timestamp(), revision(), party()) -> ok | no_return().
+assert_modifications_applicable([?cm_shop_cash_register_modification_unit(_, _) | Others], Timestamp, Revision, Party) ->
+    assert_modifications_applicable(Others, Timestamp, Revision, Party);
+assert_modifications_applicable([PartyChange | Others], Timestamp, Revision, Party) ->
     case PartyChange of
         ?cm_contract_modification(ID, Modification) ->
             Contract = pm_party:get_contract(ID, Party),
-            ok = assert_contract_change_applicable(ID, Modification, Contract, PartyChange);
+            ok = assert_contract_modification_applicable(ID, Modification, Contract, PartyChange);
         ?cm_shop_modification(ID, Modification) ->
             Shop = pm_party:get_shop(ID, Party),
-            ok = assert_shop_change_applicable(ID, Modification, Shop, Party, Revision, PartyChange);
+            ok = assert_shop_modification_applicable(ID, Modification, Shop, Party, Revision, PartyChange);
         ?cm_contractor_modification(ID, Modification) ->
             Contractor = pm_party:get_contractor(ID, Party),
-            ok = assert_contractor_change_applicable(ID, Modification, Contractor, PartyChange);
+            ok = assert_contractor_modification_applicable(ID, Modification, Contractor, PartyChange);
         ?cm_wallet_modification(ID, Modification) ->
             Wallet = pm_party:get_wallet(ID, Party),
-            ok = assert_wallet_change_applicable(ID, Modification, Wallet, PartyChange)
+            ok = assert_wallet_modification_applicable(ID, Modification, Wallet, PartyChange)
     end,
     Effect = pm_claim_committer_effect:make_safe(PartyChange, Timestamp, Revision),
-    assert_changeset_applicable(
+    assert_modifications_applicable(
         Others, Timestamp, Revision, pm_claim_committer_effect:apply_claim_effect(Effect, Timestamp, Party)
     );
-assert_changeset_applicable([], _, _, _) ->
+assert_modifications_applicable([], _, _, _) ->
     ok.
 
-assert_contract_change_applicable(_, {creation, _}, undefined, _) ->
+assert_contract_modification_applicable(_, {creation, _}, undefined, _) ->
     ok;
-assert_contract_change_applicable(ID, {creation, _}, #domain_Contract{}, PartyChange) ->
+assert_contract_modification_applicable(ID, {creation, _}, #domain_Contract{}, PartyChange) ->
     raise_invalid_changeset(?cm_invalid_contract_already_exists(ID), [PartyChange]);
-assert_contract_change_applicable(ID, _AnyModification, undefined, PartyChange) ->
+assert_contract_modification_applicable(ID, _AnyModification, undefined, PartyChange) ->
     raise_invalid_changeset(?cm_invalid_contract_not_exists(ID), [PartyChange]);
-assert_contract_change_applicable(ID, ?cm_contract_termination(_), Contract, PartyChange) ->
+assert_contract_modification_applicable(ID, ?cm_contract_termination(_), Contract, PartyChange) ->
     case pm_contract:is_active(Contract) of
         true ->
             ok;
@@ -128,7 +128,7 @@ assert_contract_change_applicable(ID, ?cm_contract_termination(_), Contract, Par
                 PartyChange
             ])
     end;
-assert_contract_change_applicable(ID, ?cm_adjustment_creation(AdjustmentID, _), Contract, PartyChange) ->
+assert_contract_modification_applicable(ID, ?cm_adjustment_creation(AdjustmentID, _), Contract, PartyChange) ->
     case pm_contract:get_adjustment(AdjustmentID, Contract) of
         undefined ->
             ok;
@@ -137,30 +137,30 @@ assert_contract_change_applicable(ID, ?cm_adjustment_creation(AdjustmentID, _), 
                 PartyChange
             ])
     end;
-assert_contract_change_applicable(ID, ?cm_payout_tool_creation(PayoutToolID, _), Contract, PartyChange) ->
+assert_contract_modification_applicable(ID, ?cm_payout_tool_creation(PayoutToolID, _), Contract, PartyChange) ->
     case pm_contract:get_payout_tool(PayoutToolID, Contract) of
         undefined ->
             ok;
         _ ->
             raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_already_exists, PayoutToolID}), [PartyChange])
     end;
-assert_contract_change_applicable(ID, ?cm_payout_tool_info_modification(PayoutToolID, _), Contract, PartyChange) ->
+assert_contract_modification_applicable(ID, ?cm_payout_tool_info_modification(PayoutToolID, _), Contract, PartyChange) ->
     case pm_contract:get_payout_tool(PayoutToolID, Contract) of
         undefined ->
             raise_invalid_changeset(?cm_invalid_contract(ID, {payout_tool_not_exists, PayoutToolID}), [PartyChange]);
         _ ->
             ok
     end;
-assert_contract_change_applicable(_, _, _, _) ->
+assert_contract_modification_applicable(_, _, _, _) ->
     ok.
 
-assert_shop_change_applicable(_, {creation, _}, undefined, _, _, _) ->
+assert_shop_modification_applicable(_, {creation, _}, undefined, _, _, _) ->
     ok;
-assert_shop_change_applicable(ID, _AnyModification, undefined, _, _, PartyChange) ->
+assert_shop_modification_applicable(ID, _AnyModification, undefined, _, _, PartyChange) ->
     raise_invalid_changeset(?cm_invalid_shop_not_exists(ID), [PartyChange]);
-assert_shop_change_applicable(ID, {creation, _}, #domain_Shop{}, _, _, PartyChange) ->
+assert_shop_modification_applicable(ID, {creation, _}, #domain_Shop{}, _, _, PartyChange) ->
     raise_invalid_changeset(?cm_invalid_shop_already_exists(ID), [PartyChange]);
-assert_shop_change_applicable(
+assert_shop_modification_applicable(
     _ID,
     {shop_account_creation, _},
     #domain_Shop{account = Account},
@@ -169,7 +169,7 @@ assert_shop_change_applicable(
     _PartyChange
 ) when Account /= undefined ->
     throw(#'InvalidRequest'{errors = [<<"Can't change shop's account">>]});
-assert_shop_change_applicable(
+assert_shop_modification_applicable(
     _ID,
     {contract_modification, #claim_management_ShopContractModification{contract_id = NewContractID}},
     #domain_Shop{contract_id = OldContractID},
@@ -184,32 +184,32 @@ assert_shop_change_applicable(
         undefined ->
             raise_invalid_changeset(?cm_invalid_contract_not_exists(NewContractID), [PartyChange])
     end;
-assert_shop_change_applicable(_, _, _, _, _, _) ->
+assert_shop_modification_applicable(_, _, _, _, _, _) ->
     ok.
 
-assert_contractor_change_applicable(_, {creation, _}, undefined, _) ->
+assert_contractor_modification_applicable(_, {creation, _}, undefined, _) ->
     ok;
-assert_contractor_change_applicable(ID, _AnyModification, undefined, PartyChange) ->
+assert_contractor_modification_applicable(ID, _AnyModification, undefined, PartyChange) ->
     raise_invalid_changeset(?cm_invalid_contractor_not_exists(ID), [PartyChange]);
-assert_contractor_change_applicable(ID, {creation, _}, #domain_PartyContractor{}, PartyChange) ->
+assert_contractor_modification_applicable(ID, {creation, _}, #domain_PartyContractor{}, PartyChange) ->
     raise_invalid_changeset(?cm_invalid_contractor_already_exists(ID), [PartyChange]);
-assert_contractor_change_applicable(_, _, _, _) ->
+assert_contractor_modification_applicable(_, _, _, _) ->
     ok.
 
-assert_wallet_change_applicable(_, {creation, _}, undefined, _) ->
+assert_wallet_modification_applicable(_, {creation, _}, undefined, _) ->
     ok;
-assert_wallet_change_applicable(ID, _AnyModification, undefined, PartyChange) ->
+assert_wallet_modification_applicable(ID, _AnyModification, undefined, PartyChange) ->
     raise_invalid_changeset(?cm_invalid_wallet_not_exists(ID), [PartyChange]);
-assert_wallet_change_applicable(ID, {creation, _}, #domain_Wallet{}, PartyChange) ->
+assert_wallet_modification_applicable(ID, {creation, _}, #domain_Wallet{}, PartyChange) ->
     raise_invalid_changeset(?cm_invalid_wallet_already_exists(ID), [PartyChange]);
-assert_wallet_change_applicable(
+assert_wallet_modification_applicable(
     _ID,
     {account_creation, _},
     #domain_Wallet{account = Account},
     _PartyChange
 ) when Account /= undefined ->
     throw(#'InvalidRequest'{errors = [<<"Can't change wallet's account">>]});
-assert_wallet_change_applicable(_, _, _, _) ->
+assert_wallet_modification_applicable(_, _, _, _) ->
     ok.
 
 assert_payment_institution_realm_equals(
@@ -250,13 +250,13 @@ raise_invalid_payment_institution(ContractID, Ref, PartyChange) ->
         [PartyChange]
     ).
 
--spec assert_changeset_acceptable(modifications(), timestamp(), revision(), party()) -> ok | no_return().
-assert_changeset_acceptable(Changes, Timestamp, Revision, Party0) ->
-    Effects = pm_claim_committer_effect:make_changeset_safe_effects(Changes, Timestamp, Revision),
+-spec assert_modifications_acceptable(modifications(), timestamp(), revision(), party()) -> ok | no_return().
+assert_modifications_acceptable(Modifications, Timestamp, Revision, Party0) ->
+    Effects = pm_claim_committer_effect:make_modifications_safe_effects(Modifications, Timestamp, Revision),
     Party = pm_claim_committer_effect:apply_effects(Effects, Timestamp, Party0),
-    _ = assert_contracts_valid(Timestamp, Revision, Party, Changes),
-    _ = assert_shops_valid(Timestamp, Revision, Party, Changes),
-    _ = assert_wallets_valid(Timestamp, Revision, Party, Changes),
+    _ = assert_contracts_valid(Timestamp, Revision, Party, Modifications),
+    _ = assert_shops_valid(Timestamp, Revision, Party, Modifications),
+    _ = assert_wallets_valid(Timestamp, Revision, Party, Modifications),
     ok.
 
 assert_contracts_valid(_Timestamp, _Revision, Party, Changeset) ->

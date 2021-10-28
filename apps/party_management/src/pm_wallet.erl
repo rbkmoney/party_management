@@ -81,10 +81,4 @@ create_fake_account(#payproc_WalletAccountParams{currency = Currency}) ->
         currency = Currency,
         settlement = 0,
         payout = 0
-    };
-create_fake_account(#claim_management_WalletAccountParams{currency = Currency}) ->
-    #domain_WalletAccount{
-        currency = Currency,
-        settlement = 0,
-        payout = 0
     }.

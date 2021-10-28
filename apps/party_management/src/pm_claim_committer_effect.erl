@@ -11,8 +11,8 @@
 -export([apply_claim_effect/3]).
 -export([apply_effects/3]).
 -export([squash_effects/1]).
--export([make_changeset_effects/3]).
--export([make_changeset_safe_effects/3]).
+-export([make_modifications_effects/3]).
+-export([make_modifications_safe_effects/3]).
 
 -export_type([effect/0]).
 
@@ -346,24 +346,23 @@ apply_effects(Effects, Timestamp, Party) ->
         Effects
     ).
 
--spec make_changeset_effects(modifications(), timestamp(), revision()) -> effects().
-make_changeset_effects(Changes, Timestamp, Revision) ->
-    pm_claim_committer_effect:squash_effects(
-        lists:map(
-            fun(Change) ->
-                pm_claim_committer_effect:make(Change, Timestamp, Revision)
-            end,
-            Changes
-        )
-    ).
+-spec make_modifications_effects(modifications(), timestamp(), revision()) -> effects().
+make_modifications_effects(Modifications, Timestamp, Revision) ->
+    make_effects(Modifications, Timestamp, Revision, fun make/3).
 
--spec make_changeset_safe_effects(modifications(), timestamp(), revision()) -> effects().
-make_changeset_safe_effects(Changes, Timestamp, Revision) ->
-    pm_claim_committer_effect:squash_effects(
-        lists:map(
-            fun(Change) ->
-                pm_claim_committer_effect:make_safe(Change, Timestamp, Revision)
+-spec make_modifications_safe_effects(modifications(), timestamp(), revision()) -> effects().
+make_modifications_safe_effects(Modifications, Timestamp, Revision) ->
+    make_effects(Modifications, Timestamp, Revision, fun make_safe/3).
+
+make_effects(Modifications, Timestamp, Revision, Fun) ->
+    squash_effects(
+        lists:filtermap(
+            fun
+                (?cm_shop_cash_register_modification_unit(_, _)) ->
+                    false;
+                (Change) ->
+                    {true, Fun(Change, Timestamp, Revision)}
             end,
-            Changes
+            Modifications
         )
     ).
