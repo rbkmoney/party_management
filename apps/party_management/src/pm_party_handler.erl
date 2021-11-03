@@ -56,13 +56,23 @@ handle_function_('ComputeContractTerms', Args, _Opts) ->
     ok = set_meta_and_check_access(UserInfo, PartyID),
     Party = checkout_party(PartyID, PartyRevisionParams),
     Contract = ensure_contract(pm_party:get_contract(ContractID, Party)),
-    VS0 = #{
+    VS =
+        case pm_varset:decode_varset(Varset) of
+            #{shop_id := ShopID} = VS0 ->
+                Shop = ensure_shop(pm_party:get_shop(ShopID, Party)),
+                VS0#{
+                    category => Shop#domain_Shop.category,
+                    currency => (Shop#domain_Shop.account)#domain_ShopAccount.currency
+                };
+            #{} = VS0 ->
+                VS0
+        end,
+    DecodedVS = VS#{
         party_id => PartyID,
         identification_level => get_identification_level(Contract, Party)
     },
-    VS1 = prepare_varset(PartyID, Varset, VS0),
     Terms = pm_party:get_terms(Contract, Timestamp, DomainRevision),
-    pm_party:reduce_terms(Terms, VS1, DomainRevision);
+    pm_party:reduce_terms(Terms, DecodedVS, DomainRevision);
 %% Shop
 
 handle_function_('GetShop', {UserInfo, PartyID, ID}, _Opts) ->
@@ -82,7 +92,14 @@ handle_function_('ComputeShopTerms', {UserInfo, PartyID, ShopID, Timestamp, Part
     Shop = ensure_shop(pm_party:get_shop(ShopID, Party)),
     Contract = pm_party:get_contract(Shop#domain_Shop.contract_id, Party),
     Revision = pm_domain:head(),
-    DecodedVS = pm_varset:decode_varset(Varset),
+    VS0 = pm_varset:decode_varset(Varset),
+    DecodedVS = VS0#{
+        party_id => PartyID,
+        shop_id => ShopID,
+        category => Shop#domain_Shop.category,
+        currency => (Shop#domain_Shop.account)#domain_ShopAccount.currency,
+        identification_level => get_identification_level(Contract, Party)
+    },
     pm_party:reduce_terms(pm_party:get_terms(Contract, Timestamp, Revision), DecodedVS, Revision);
 handle_function_(Fun, Args, _Opts) when
     Fun =:= 'BlockShop' orelse
@@ -94,18 +111,6 @@ handle_function_(Fun, Args, _Opts) when
     PartyID = erlang:element(2, Args),
     ok = set_meta_and_check_access(UserInfo, PartyID),
     call(PartyID, Fun, Args);
-%% Wallet
-
-handle_function_('ComputeWalletTermsNew', {UserInfo, PartyID, ContractID, Timestamp, Varset}, _Opts) ->
-    ok = set_meta_and_check_access(UserInfo, PartyID),
-    Party = checkout_party(PartyID, {timestamp, Timestamp}),
-    Contract = pm_party:get_contract(ContractID, Party),
-    Revision = pm_domain:head(),
-    VS0 = #{
-        identification_level => get_identification_level(Contract, Party)
-    },
-    VS1 = prepare_varset(PartyID, Varset, VS0),
-    pm_party:reduce_terms(pm_party:get_terms(Contract, Timestamp, Revision), VS1, Revision);
 %% Claim
 
 handle_function_('GetClaim', {UserInfo, PartyID, ID}, _Opts) ->
@@ -147,14 +152,14 @@ handle_function_('ComputeProvider', Args, _Opts) ->
     {UserInfo, ProviderRef, DomainRevision, Varset} = Args,
     ok = assume_user_identity(UserInfo),
     Provider = get_provider(ProviderRef, DomainRevision),
-    VS = prepare_varset(Varset),
+    VS = pm_varset:decode_varset(Varset),
     pm_provider:reduce_provider(Provider, VS, DomainRevision);
 handle_function_('ComputeProviderTerminalTerms', Args, _Opts) ->
     {UserInfo, ProviderRef, TerminalRef, DomainRevision, Varset} = Args,
     ok = assume_user_identity(UserInfo),
     Provider = get_provider(ProviderRef, DomainRevision),
     Terminal = get_terminal(TerminalRef, DomainRevision),
-    VS = prepare_varset(Varset),
+    VS = pm_varset:decode_varset(Varset),
     pm_provider:reduce_provider_terminal_terms(Provider, Terminal, VS, DomainRevision);
 %% Globals
 
@@ -162,7 +167,7 @@ handle_function_('ComputeGlobals', Args, _Opts) ->
     {UserInfo, DomainRevision, Varset} = Args,
     ok = assume_user_identity(UserInfo),
     Globals = get_globals(DomainRevision),
-    VS = prepare_varset(Varset),
+    VS = pm_varset:decode_varset(Varset),
     pm_globals:reduce_globals(Globals, VS, DomainRevision);
 %% RuleSets
 
@@ -171,13 +176,13 @@ handle_function_('ComputePaymentRoutingRuleset', Args, _Opts) ->
     {UserInfo, RuleSetRef, DomainRevision, Varset} = Args,
     ok = assume_user_identity(UserInfo),
     RuleSet = get_payment_routing_ruleset(RuleSetRef, DomainRevision),
-    VS = prepare_varset(Varset),
+    VS = pm_varset:decode_varset(Varset),
     pm_ruleset:reduce_payment_routing_ruleset(RuleSet, VS, DomainRevision);
 handle_function_('ComputeRoutingRuleset', Args, _Opts) ->
     {UserInfo, RuleSetRef, DomainRevision, Varset} = Args,
     ok = assume_user_identity(UserInfo),
     RuleSet = get_payment_routing_ruleset(RuleSetRef, DomainRevision),
-    VS = prepare_varset(Varset),
+    VS = pm_varset:decode_varset(Varset),
     pm_ruleset:reduce_payment_routing_ruleset(RuleSet, VS, DomainRevision);
 %% PartyMeta
 
@@ -205,7 +210,7 @@ handle_function_(
     ok = assume_user_identity(UserInfo),
     Revision = pm_domain:head(),
     PaymentInstitution = get_payment_institution(PaymentInstitutionRef, Revision),
-    VS = prepare_varset(Varset),
+    VS = pm_varset:decode_varset(Varset),
     ContractTemplate = get_default_contract_template(PaymentInstitution, VS, Revision),
     Terms = pm_party:get_terms(ContractTemplate, pm_datetime:format_now(), Revision),
     pm_party:reduce_terms(Terms, VS, Revision);
@@ -213,7 +218,7 @@ handle_function_('ComputePaymentInstitution', Args, _Opts) ->
     {UserInfo, PaymentInstitutionRef, DomainRevision, Varset} = Args,
     ok = assume_user_identity(UserInfo),
     PaymentInstitution = get_payment_institution(PaymentInstitutionRef, DomainRevision),
-    VS = prepare_varset(Varset),
+    VS = pm_varset:decode_varset(Varset),
     pm_payment_institution:reduce_payment_institution(PaymentInstitution, VS, DomainRevision);
 %% Payouts adhocs
 
@@ -381,29 +386,6 @@ collect_payout_account_map(
         {system, settlement} => SystemAccount#domain_SystemAccount.settlement,
         {system, subagent} => SystemAccount#domain_SystemAccount.subagent
     }.
-
-prepare_varset(#payproc_Varset{} = V) ->
-    prepare_varset(undefined, V).
-
-prepare_varset(PartyID, #payproc_Varset{} = V) ->
-    prepare_varset(PartyID, V, #{}).
-
-prepare_varset(PartyID0, #payproc_Varset{} = V, VS0) ->
-    PartyID1 = get_party_id(V, PartyID0),
-    VS1 = pm_varset:decode_varset(V, VS0),
-    genlib_map:compact(VS1#{party_id => PartyID1}).
-
-get_party_id(V, undefined) ->
-    V#payproc_Varset.party_id;
-get_party_id(#payproc_Varset{party_id = undefined}, PartyID) ->
-    PartyID;
-get_party_id(#payproc_Varset{party_id = PartyID1}, PartyID2) when PartyID1 =:= PartyID2 ->
-    PartyID1;
-get_party_id(#payproc_Varset{party_id = PartyID1}, PartyID2) when PartyID1 =/= PartyID2 ->
-    throw(#payproc_VarsetPartyNotMatch{
-        varset_party_id = PartyID1,
-        agrument_party_id = PartyID2
-    }).
 
 get_identification_level(#domain_Contract{contractor_id = undefined, contractor = Contractor}, _) ->
     %% TODO legacy, remove after migration

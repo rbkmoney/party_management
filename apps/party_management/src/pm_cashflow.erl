@@ -49,7 +49,7 @@ compute_postings(CF, Context, AccountMap) ->
             compute_volume(Volume, Context),
             Details
         )
-     || ?posting(Source, Destination, Volume, Details) <- CF
+        || ?posting(Source, Destination, Volume, Details) <- CF
     ].
 
 construct_final_account(AccountType, AccountMap) ->
