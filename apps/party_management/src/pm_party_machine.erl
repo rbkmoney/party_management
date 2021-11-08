@@ -265,9 +265,9 @@ handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
         throw:#payproc_InvalidChangeset{reason = Reason0} ->
             ModificationChangeset = [
                 Modification
-                || #claim_management_ModificationUnit{
-                       modification = Modification
-                   } <- Changeset
+             || #claim_management_ModificationUnit{
+                    modification = Modification
+                } <- Changeset
             ],
             ReasonLegacy = unicode:characters_to_binary(io_lib:format("~0tp", [Reason0])),
             % TODO ED-274:  временная функция для возможности работы со старой системой исключений
