@@ -327,18 +327,8 @@ end_per_testcase(_Name, _C) ->
     suspension = Suspension
 }).
 
--define(wallet_w_status(ID, Blocking, Suspension), #domain_Wallet{
-    id = ID,
-    blocking = Blocking,
-    suspension = Suspension
-}).
-
 -define(invalid_user(),
     {exception, #payproc_InvalidUser{}}
-).
-
--define(invalid_request(Errors),
-    {exception, #'InvalidRequest'{errors = Errors}}
 ).
 
 -define(party_not_found(),
@@ -377,14 +367,6 @@ end_per_testcase(_Name, _C) ->
     {exception, #payproc_ContractNotFound{}}
 ).
 
--define(invalid_contract_status(Status),
-    {exception, #payproc_InvalidContractStatus{status = Status}}
-).
-
--define(payout_tool_not_found(),
-    {exception, #payproc_PayoutToolNotFound{}}
-).
-
 -define(shop_not_found(),
     {exception, #payproc_ShopNotFound{}}
 ).
@@ -403,26 +385,6 @@ end_per_testcase(_Name, _C) ->
 
 -define(shop_active(),
     {exception, #payproc_InvalidShopStatus{status = {suspension, ?active(_)}}}
-).
-
--define(wallet_not_found(),
-    {exception, #payproc_WalletNotFound{}}
-).
-
--define(wallet_blocked(Reason),
-    {exception, #payproc_InvalidWalletStatus{status = {blocking, ?blocked(Reason, _)}}}
-).
-
--define(wallet_unblocked(Reason),
-    {exception, #payproc_InvalidWalletStatus{status = {blocking, ?unblocked(Reason, _)}}}
-).
-
--define(wallet_suspended(),
-    {exception, #payproc_InvalidWalletStatus{status = {suspension, ?suspended(_)}}}
-).
-
--define(wallet_active(),
-    {exception, #payproc_InvalidWalletStatus{status = {suspension, ?active(_)}}}
 ).
 
 -define(claim(ID), #payproc_Claim{id = ID}).
@@ -444,7 +406,6 @@ end_per_testcase(_Name, _C) ->
 -define(REAL_SHOP_ID, <<"SHOP1">>).
 -define(REAL_CONTRACTOR_ID, <<"CONTRACTOR1">>).
 -define(REAL_CONTRACT_ID, <<"CONTRACT1">>).
--define(REAL_WALLET_ID, <<"WALLET1">>).
 -define(REAL_PARTY_PAYMENT_METHODS, [
     ?pmt(bank_card_deprecated, maestro),
     ?pmt(bank_card_deprecated, mastercard),

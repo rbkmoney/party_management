@@ -157,31 +157,6 @@
     )
 ).
 
-%%% Claim Committer statuses
--define(cm_pending(),
-    {pending, #claim_management_ClaimPending{}}
-).
-
--define(cm_accepted(),
-    {accepted, #claim_management_ClaimAccepted{}}
-).
-
--define(cm_denied(Reason),
-    {denied, #claim_management_ClaimDenied{reason = Reason}}
-).
-
--define(cm_revoked(Reason),
-    {revoked, #claim_management_ClaimRevoked{reason = Reason}}
-).
-
--define(cm_pending_acceptance(),
-    {pending_acceptance, #claim_management_ClaimPendingAcceptance{}}
-).
-
--define(cm_review(),
-    {review, #claim_management_ClaimReview{}}
-).
-
 %%% Error
 
 -define(cm_invalid_party_changeset(Reason, InvalidChangeset), #claim_management_InvalidChangeset{
