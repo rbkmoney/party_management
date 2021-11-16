@@ -17,126 +17,27 @@
 -module(pm_claim_committer_converter).
 
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
--include_lib("damsel/include/dmsl_claim_management_thrift.hrl").
 
--include("claim_management.hrl").
 -include("party_events.hrl").
 
 %% API
--export([new_party_claim/5]).
+-export([new_party_claim/4]).
 
 -type payproc_claim() :: dmsl_payment_processing_thrift:'Claim'().
 -type timestamp() :: pm_datetime:timestamp().
 -type revision() :: pm_domain:revision().
 -type claim_id() :: dmsl_claim_management_thrift:'ClaimID'().
--type modifications() :: pm_claim_committer:modifications().
 
--spec new_party_claim(claim_id(), revision(), timestamp(), timestamp(), modifications()) -> payproc_claim().
-new_party_claim(ID, Revision, CreatedAt, UpdatedAt, Modifications) ->
+-spec new_party_claim(claim_id(), revision(), timestamp(), timestamp()) -> payproc_claim().
+new_party_claim(ID, Revision, CreatedAt, UpdatedAt) ->
     #payproc_Claim{
         id = ID,
         status = ?pending(),
-        changeset = to_party_changeset(Modifications),
         revision = Revision,
         created_at = CreatedAt,
-        updated_at = UpdatedAt
+        updated_at = UpdatedAt,
+        caused_by = build_claim_ref(ID, Revision)
     }.
 
-to_party_changeset(Modifications) ->
-    lists:filtermap(
-        fun
-            (?cm_shop_cash_register_modification_unit(_, _)) ->
-                false;
-            (Mod) ->
-                {true, to_payproc_party_modification(Mod)}
-        end,
-        Modifications
-    ).
-
-to_payproc_party_modification(?cm_contractor_modification(ContractorID, ContractorModification)) ->
-    ?contractor_modification(ContractorID, ContractorModification);
-to_payproc_party_modification(?cm_contract_modification(ContractID, ContractModification)) ->
-    ?contract_modification(
-        ContractID,
-        to_payproc_contract_modification(ContractModification)
-    );
-to_payproc_party_modification(?cm_shop_modification(ShopID, ShopModification)) ->
-    ?shop_modification(
-        ShopID,
-        to_payproc_shop_modification(ShopModification)
-    ).
-
-to_payproc_contract_modification(
-    {creation, #claim_management_ContractParams{
-        contractor_id = ContractorID,
-        template = ContractTemplateRef,
-        payment_institution = PaymentInstitutionRef
-    }}
-) ->
-    {creation, #payproc_ContractParams{
-        contractor_id = ContractorID,
-        template = ContractTemplateRef,
-        payment_institution = PaymentInstitutionRef
-    }};
-to_payproc_contract_modification(?cm_contract_termination(Reason)) ->
-    ?contract_termination(Reason);
-to_payproc_contract_modification(?cm_adjustment_creation(ContractAdjustmentID, Params)) ->
-    ContractTemplateRef = Params#claim_management_ContractAdjustmentParams.template,
-    ?adjustment_creation(
-        ContractAdjustmentID,
-        #payproc_ContractAdjustmentParams{template = ContractTemplateRef}
-    );
-to_payproc_contract_modification(
-    ?cm_payout_tool_creation(PayoutToolID, #claim_management_PayoutToolParams{
-        currency = CurrencyRef,
-        tool_info = PayoutToolInfo
-    })
-) ->
-    ?payout_tool_creation(PayoutToolID, #payproc_PayoutToolParams{
-        currency = CurrencyRef,
-        tool_info = PayoutToolInfo
-    });
-to_payproc_contract_modification(
-    ?cm_payout_tool_info_modification(PayoutToolID, PayoutToolModification)
-) ->
-    ?payout_tool_info_modification(PayoutToolID, PayoutToolModification);
-to_payproc_contract_modification(
-    {legal_agreement_binding, _LegalAgreement} = LegalAgreementBinding
-) ->
-    LegalAgreementBinding;
-to_payproc_contract_modification(
-    {report_preferences_modification, _ReportPreferences} = ReportPreferencesModification
-) ->
-    ReportPreferencesModification;
-to_payproc_contract_modification({contractor_modification, _ContractorID} = ContractorModification) ->
-    ContractorModification.
-
-to_payproc_shop_modification({creation, ShopParams}) ->
-    #claim_management_ShopParams{
-        category = CategoryRef,
-        location = ShopLocation,
-        details = ShopDetails,
-        contract_id = ContractID,
-        payout_tool_id = PayoutToolID
-    } = ShopParams,
-    {creation, #payproc_ShopParams{
-        category = CategoryRef,
-        location = ShopLocation,
-        details = ShopDetails,
-        contract_id = ContractID,
-        payout_tool_id = PayoutToolID
-    }};
-to_payproc_shop_modification({category_modification, _CategoryRef} = CategoryModification) ->
-    CategoryModification;
-to_payproc_shop_modification({details_modification, _ShopDetails} = DetailsModification) ->
-    DetailsModification;
-to_payproc_shop_modification(?cm_shop_contract_modification(ContractID, PayoutToolID)) ->
-    ?shop_contract_modification(ContractID, PayoutToolID);
-to_payproc_shop_modification({payout_tool_modification, _PayoutToolID} = PayoutToolModification) ->
-    PayoutToolModification;
-to_payproc_shop_modification({location_modification, _ShopLocation} = LocationModification) ->
-    LocationModification;
-to_payproc_shop_modification(?cm_shop_account_creation_params(CurrencyRef)) ->
-    ?shop_account_creation_params(CurrencyRef);
-to_payproc_shop_modification(?cm_payout_schedule_modification(BusinessScheduleRef)) ->
-    ?payout_schedule_modification(BusinessScheduleRef).
+build_claim_ref(ID, Revision) ->
+    #payproc_ClaimManagementClaimRef{id = ID, revision = Revision}.
