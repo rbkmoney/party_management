@@ -1006,6 +1006,8 @@ ensure_claim(
         status = Status
     }.
 
+ensure_claim_changeset(undefined, _) ->
+    undefined;
 ensure_claim_changeset(Changeset, Timestamp) ->
     [ensure_contract_change(C, Timestamp) || C <- Changeset].
 
