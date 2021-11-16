@@ -267,7 +267,7 @@ assert_modifications_acceptable(Modifications, Timestamp, Revision, Party0) ->
         _ = pm_claim_committer_validator:assert_wallets_valid(Timestamp, Revision, Party),
         ok
     catch
-        throw:?cm_invalid_party_changeset(Reason, _):S ->
+        throw:#claim_management_InvalidChangeset{reason = Reason}:S ->
             erlang:raise(throw, build_invalid_party_changeset(Reason, Modifications), S)
     end.
 
