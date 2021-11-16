@@ -261,14 +261,22 @@ raise_invalid_payment_institution(ContractID, Ref, PartyChange) ->
 assert_modifications_acceptable(Modifications, Timestamp, Revision, Party0) ->
     Effects = pm_claim_committer_effect:make_modifications_safe_effects(Modifications, Timestamp, Revision),
     Party = pm_claim_committer_effect:apply_effects(Effects, Timestamp, Party0),
-    _ = pm_claim_committer_validator:assert_contracts_valid(Party, Modifications),
-    _ = pm_claim_committer_validator:assert_shops_valid(Timestamp, Revision, Party, Modifications),
-    _ = pm_claim_committer_validator:assert_wallets_valid(Timestamp, Revision, Party, Modifications),
-    ok.
+    try
+        _ = pm_claim_committer_validator:assert_contracts_valid(Party),
+        _ = pm_claim_committer_validator:assert_shops_valid(Timestamp, Revision, Party),
+        _ = pm_claim_committer_validator:assert_wallets_valid(Timestamp, Revision, Party),
+        ok
+    catch
+        throw:?cm_invalid_party_changeset(Reason, _):S ->
+            erlang:raise(throw, build_invalid_party_changeset(Reason, Modifications), S)
+    end.
 
 -spec raise_invalid_changeset(dmsl_claim_management_thrift:'InvalidChangesetReason'(), modifications()) -> no_return().
 raise_invalid_changeset(Reason, Modifications) ->
-    throw(?cm_invalid_party_changeset(Reason, [{party_modification, C} || C <- Modifications])).
+    throw(build_invalid_party_changeset(Reason, Modifications)).
+
+build_invalid_party_changeset(Reason, Modifications) ->
+    ?cm_invalid_party_changeset(Reason, [{party_modification, C} || C <- Modifications]).
 
 make_optional_domain_ref(_, undefined) ->
     undefined;
