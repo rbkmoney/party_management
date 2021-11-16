@@ -246,12 +246,7 @@ handle_call('Accept', {_PartyID, #claim_management_Claim{changeset = Changeset}}
     ok = pm_claim_committer:assert_cash_register_modifications_applicable(Modifications, Party),
     ok = pm_claim_committer:assert_modifications_applicable(Modifications, Timestamp, Revision, Party),
     ok = pm_claim_committer:assert_modifications_acceptable(Modifications, Timestamp, Revision, Party),
-    respond(
-        ok,
-        [],
-        AuxSt,
-        St
-    );
+    respond(ok, [], AuxSt, St);
 handle_call('Commit', {_PartyID, Claim}, AuxSt, St) ->
     #claim_management_Claim{
         id = ID,
