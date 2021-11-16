@@ -71,7 +71,6 @@ create(ID, #payproc_ContractParams{} = Params, Timestamp, Revision) ->
 create(ID, #claim_management_ContractParams{} = Params, Timestamp, Revision) ->
     #claim_management_ContractParams{
         contractor_id = ContractorID,
-        %% Legacy
         template = TemplateRef,
         payment_institution = PaymentInstitutionRef
     } = ensure_contract_creation_params(Params, Revision),
