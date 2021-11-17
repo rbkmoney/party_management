@@ -64,6 +64,11 @@ handle_function_('ComputeContractTerms', Args, _Opts) ->
                     category => Shop#domain_Shop.category,
                     currency => (Shop#domain_Shop.account)#domain_ShopAccount.currency
                 };
+            #{wallet_id := WalletID} = VS0 ->
+                Wallet = pm_party:get_wallet(WalletID, Party),
+                VS0#{
+                    currency => (Wallet#domain_Wallet.account)#domain_WalletAccount.currency
+                };
             #{} = VS0 ->
                 VS0
         end,
