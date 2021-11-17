@@ -267,16 +267,13 @@ assert_modifications_acceptable(Modifications, Timestamp, Revision, Party0) ->
         _ = pm_claim_committer_validator:assert_wallets_valid(Timestamp, Revision, Party),
         ok
     catch
-        throw:#claim_management_InvalidChangeset{reason = Reason}:S ->
-            erlang:raise(throw, build_invalid_party_changeset(Reason, Modifications), S)
+        throw:{invalid_changeset, Reason}:St ->
+            erlang:raise(throw, raise_invalid_changeset(Reason, Modifications), St)
     end.
 
 -spec raise_invalid_changeset(dmsl_claim_management_thrift:'InvalidChangesetReason'(), modifications()) -> no_return().
 raise_invalid_changeset(Reason, Modifications) ->
-    throw(build_invalid_party_changeset(Reason, Modifications)).
-
-build_invalid_party_changeset(Reason, Modifications) ->
-    ?cm_invalid_party_changeset(Reason, [{party_modification, C} || C <- Modifications]).
+    throw(?cm_invalid_party_changeset(Reason, [{party_modification, C} || C <- Modifications])).
 
 make_optional_domain_ref(_, undefined) ->
     undefined;

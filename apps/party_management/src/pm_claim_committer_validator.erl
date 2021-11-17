@@ -69,19 +69,13 @@ assert_contract_valid(
         #domain_PartyContractor{} ->
             ok;
         undefined ->
-            pm_claim_committer:raise_invalid_changeset(
-                ?cm_invalid_contract_contractor_not_exists(ID, ContractorID),
-                []
-            )
+            throw({invalid_changeset, ?cm_invalid_contract_contractor_not_exists(ID, ContractorID)})
     end;
 assert_contract_valid(
     #domain_Contract{id = ID, contractor_id = undefined, contractor = undefined},
     _Party
 ) ->
-    pm_claim_committer:raise_invalid_changeset(
-        ?cm_invalid_contract_contractor_not_exists(ID, undefined),
-        []
-    );
+    throw({invalid_changeset, ?cm_invalid_contract_contractor_not_exists(ID, undefined)});
 assert_contract_valid(_, _) ->
     ok.
 
@@ -92,7 +86,7 @@ assert_shop_valid(#domain_Shop{contract_id = ContractID} = Shop, Timestamp, Revi
             _ = assert_shop_payout_tool_valid(Shop, Contract),
             ok;
         undefined ->
-            pm_claim_committer:raise_invalid_changeset(?cm_invalid_contract_not_exists(ContractID), [])
+            throw({invalid_changeset, ?cm_invalid_contract_not_exists(ContractID)})
     end.
 
 assert_shop_contract_valid(
@@ -106,7 +100,7 @@ assert_shop_contract_valid(
         #domain_ShopAccount{currency = CurrencyRef} ->
             _ = assert_currency_valid({shop, ID}, pm_contract:get_id(Contract), CurrencyRef, Terms, Revision);
         undefined ->
-            pm_claim_committer:raise_invalid_changeset(?cm_invalid_shop_account_not_exists(ID), [])
+            throw({invalid_changeset, ?cm_invalid_shop_account_not_exists(ID)})
     end,
     #domain_TermSet{
         payments = #domain_PaymentsServiceTerms{categories = CategorySelector}
@@ -114,14 +108,13 @@ assert_shop_contract_valid(
     Categories = pm_selector:reduce_to_value(CategorySelector, #{}, Revision),
     _ =
         ordsets:is_element(CategoryRef, Categories) orelse
-            pm_claim_committer:raise_invalid_changeset(
+            throw({invalid_changeset,
                 ?cm_invalid_shop_contract_terms_violated(
                     ID,
                     pm_contract:get_id(Contract),
                     #domain_TermSet{payments = #domain_PaymentsServiceTerms{categories = CategorySelector}}
-                ),
-                []
-            ),
+                )
+            }),
     ok.
 
 assert_shop_payout_tool_valid(#domain_Shop{payout_tool_id = undefined, payout_schedule = undefined}, _) ->
@@ -137,20 +130,16 @@ assert_shop_payout_tool_valid(#domain_Shop{id = ID, payout_tool_id = PayoutToolI
         #domain_PayoutTool{currency = ShopAccountCurrency} ->
             ok;
         #domain_PayoutTool{currency = PayoutToolCurrency} ->
-            pm_claim_committer:raise_invalid_changeset(
+            throw({invalid_changeset,
                 ?cm_invalid_shop_payout_tool_currency_mismatch(
                     ID,
                     PayoutToolID,
                     ShopAccountCurrency,
                     PayoutToolCurrency
-                ),
-                []
-            );
+                )
+            });
         undefined ->
-            pm_claim_committer:raise_invalid_changeset(
-                ?cm_invalid_shop_payout_tool_not_in_contract(ID, ContractID, PayoutToolID),
-                []
-            )
+            throw({invalid_changeset, ?cm_invalid_shop_payout_tool_not_in_contract(ID, ContractID, PayoutToolID)})
     end.
 
 assert_wallet_valid(#domain_Wallet{contract = ContractID} = Wallet, Timestamp, Revision, Party) ->
@@ -159,7 +148,7 @@ assert_wallet_valid(#domain_Wallet{contract = ContractID} = Wallet, Timestamp, R
             _ = assert_wallet_contract_valid(Wallet, Contract, Timestamp, Revision),
             ok;
         undefined ->
-            pm_claim_committer:raise_invalid_changeset(?cm_invalid_contract_not_exists(ContractID), [])
+            throw({invalid_changeset, ?cm_invalid_contract_not_exists(ContractID)})
     end.
 
 assert_wallet_contract_valid(
@@ -174,7 +163,7 @@ assert_wallet_contract_valid(
             _ = assert_currency_valid({wallet, ID}, pm_contract:get_id(Contract), CurrencyRef, Terms, Revision),
             ok;
         undefined ->
-            pm_claim_committer:raise_invalid_changeset(?cm_invalid_wallet_account_not_exists(ID), [])
+            throw({invalid_changeset, ?cm_invalid_wallet_account_not_exists(ID)})
     end,
     ok.
 
@@ -223,6 +212,6 @@ assert_currency_valid(Prefix, ContractID, CurrencyRef, Selector, Terms, Revision
     dmsl_domain_thrift:'TermSet'()
 ) -> no_return().
 raise_contract_terms_violated({shop, ID}, ContractID, Terms) ->
-    pm_claim_committer:raise_invalid_changeset(?cm_invalid_shop_contract_terms_violated(ID, ContractID, Terms), []);
+    throw({invalid_changeset, ?cm_invalid_shop_contract_terms_violated(ID, ContractID, Terms)});
 raise_contract_terms_violated({wallet, ID}, ContractID, Terms) ->
-    pm_claim_committer:raise_invalid_changeset(?cm_invalid_wallet_contract_terms_violated(ID, ContractID, Terms), []).
+    throw({invalid_changeset, ?cm_invalid_wallet_contract_terms_violated(ID, ContractID, Terms)}).
