@@ -66,9 +66,14 @@ handle_function_('ComputeContractTerms', Args, _Opts) ->
                 };
             #{wallet_id := WalletID} = VS0 ->
                 Wallet = pm_party:get_wallet(WalletID, Party),
-                VS0#{
-                    currency => (Wallet#domain_Wallet.account)#domain_WalletAccount.currency
-                };
+                case Wallet of
+                    undefined ->
+                        VS0;
+                    Wallet ->
+                        VS0#{
+                            currency => (Wallet#domain_Wallet.account)#domain_WalletAccount.currency
+                        }
+                end;
             #{} = VS0 ->
                 VS0
         end,
