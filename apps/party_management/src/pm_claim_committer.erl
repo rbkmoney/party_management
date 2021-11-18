@@ -268,12 +268,15 @@ assert_modifications_acceptable(Modifications, Timestamp, Revision, Party0) ->
         ok
     catch
         throw:{invalid_changeset, Reason}:St ->
-            erlang:raise(throw, raise_invalid_changeset(Reason, Modifications), St)
+            erlang:raise(throw, build_invalid_party_changeset(Reason, Modifications), St)
     end.
 
 -spec raise_invalid_changeset(dmsl_claim_management_thrift:'InvalidChangesetReason'(), modifications()) -> no_return().
 raise_invalid_changeset(Reason, Modifications) ->
-    throw(?cm_invalid_party_changeset(Reason, [{party_modification, C} || C <- Modifications])).
+    throw(build_invalid_party_changeset(Reason, Modifications)).
+
+build_invalid_party_changeset(Reason, Modifications) ->
+    ?cm_invalid_party_changeset(Reason, [{party_modification, C} || C <- Modifications]).
 
 make_optional_domain_ref(_, undefined) ->
     undefined;
