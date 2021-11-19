@@ -60,20 +60,11 @@ handle_function_('ComputeContractTerms', Args, _Opts) ->
         case pm_varset:decode_varset(Varset) of
             #{shop_id := ShopID} = VS0 ->
                 Shop = ensure_shop(pm_party:get_shop(ShopID, Party)),
+                Currency = maps:get(currency, VS0, (Shop#domain_Shop.account)#domain_ShopAccount.currency),
                 VS0#{
                     category => Shop#domain_Shop.category,
-                    currency => (Shop#domain_Shop.account)#domain_ShopAccount.currency
+                    currency => Currency
                 };
-            #{wallet_id := WalletID} = VS0 ->
-                Wallet = pm_party:get_wallet(WalletID, Party),
-                case Wallet of
-                    undefined ->
-                        VS0;
-                    Wallet ->
-                        VS0#{
-                            currency => (Wallet#domain_Wallet.account)#domain_WalletAccount.currency
-                        }
-                end;
             #{} = VS0 ->
                 VS0
         end,
