@@ -110,5 +110,4 @@
     ?bank_card_payment_tool(BankName, undefined)
 ).
 
-
 -endif.
