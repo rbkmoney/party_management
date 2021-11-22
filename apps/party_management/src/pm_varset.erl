@@ -23,6 +23,9 @@
 }.
 
 -type encoded_varset() :: dmsl_payment_processing_thrift:'Varset'().
+-type contract_terms_varset() :: dmsl_payment_processing_thrift:'ComputeContractTermsVarset'().
+-type shop_terms_varset() :: dmsl_payment_processing_thrift:'ComputeShopTermsVarset'().
+
 -spec encode_varset(varset()) -> encoded_varset().
 encode_varset(Varset) ->
     #payproc_Varset{
@@ -42,8 +45,8 @@ encode_varset(Varset) ->
 -spec decode_varset(encoded_varset()) -> varset().
 decode_varset(Varset) ->
     decode_varset(Varset, #{}).
--spec decode_varset(encoded_varset(), varset()) -> varset().
-decode_varset(Varset, VS) ->
+-spec decode_varset(encoded_varset() | contract_terms_varset() | shop_terms_varset(), varset()) -> varset().
+decode_varset(Varset, VS) when is_record(Varset, payproc_Varset) ->
     genlib_map:compact(VS#{
         category => Varset#payproc_Varset.category,
         currency => Varset#payproc_Varset.currency,
@@ -59,6 +62,22 @@ decode_varset(Varset, VS) ->
         ),
         party_id => Varset#payproc_Varset.party_id,
         bin_data => Varset#payproc_Varset.bin_data
+    });
+decode_varset(Varset, VS) when is_record(Varset, payproc_ComputeShopTermsVarset) ->
+    genlib_map:compact(VS#{
+        cost => Varset#payproc_ComputeShopTermsVarset.amount,
+        payout_method => Varset#payproc_ComputeShopTermsVarset.payout_method,
+        payment_tool => Varset#payproc_ComputeShopTermsVarset.payment_tool
+    });
+decode_varset(Varset, VS) when is_record(Varset, payproc_ComputeContractTermsVarset) ->
+    genlib_map:compact(VS#{
+        currency => Varset#payproc_ComputeContractTermsVarset.currency,
+        cost => Varset#payproc_ComputeContractTermsVarset.amount,
+        shop_id => Varset#payproc_ComputeContractTermsVarset.shop_id,
+        payout_method => Varset#payproc_ComputeContractTermsVarset.payout_method,
+        payment_tool => Varset#payproc_ComputeContractTermsVarset.payment_tool,
+        wallet_id => Varset#payproc_ComputeContractTermsVarset.wallet_id,
+        bin_data => Varset#payproc_ComputeContractTermsVarset.bin_data
     }).
 
 prepare_payment_tool_var(_PaymentMethodRef, PaymentTool) when PaymentTool /= undefined ->

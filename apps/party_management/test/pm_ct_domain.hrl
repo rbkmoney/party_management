@@ -93,4 +93,22 @@
 
 -define(timeout_reason(), <<"Timeout">>).
 
+-define(bank_card_payment_tool(BankName, IsCVVEmpty),
+    {bank_card, #domain_BankCard{
+        token = <<>>,
+        bin = <<>>,
+        last_digits = <<>>,
+        bank_name = BankName,
+        payment_system = #domain_PaymentSystemRef{id = <<"VISA">>},
+        payment_system_deprecated = visa,
+        issuer_country = rus,
+        is_cvv_empty = IsCVVEmpty
+    }}
+).
+
+-define(bank_card_payment_tool(BankName),
+    ?bank_card_payment_tool(BankName, undefined)
+).
+
+
 -endif.
