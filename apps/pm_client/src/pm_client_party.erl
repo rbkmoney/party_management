@@ -85,6 +85,8 @@
 -type party_revision_param() :: dmsl_payment_processing_thrift:'PartyRevisionParam'().
 -type payment_intitution_ref() :: dmsl_domain_thrift:'PaymentInstitutionRef'().
 -type varset() :: dmsl_payment_processing_thrift:'Varset'().
+-type contract_terms_varset() :: dmsl_payment_processing_thrift:'ComputeContractTermsVarset'().
+-type shop_terms_varset() :: dmsl_payment_processing_thrift:'ComputeShopTermsVarset'().
 
 -type provider_ref() :: dmsl_domain_thrift:'ProviderRef'().
 -type terminal_ref() :: dmsl_domain_thrift:'TerminalRef'().
@@ -169,7 +171,9 @@ remove_metadata(NS, Client) ->
 get_contract(ID, Client) ->
     map_result_error(gen_server:call(Client, {call, 'GetContract', [ID]})).
 
--spec compute_contract_terms(contract_id(), timestamp(), party_revision_param(), domain_revision(), varset(), pid()) ->
+-spec compute_contract_terms(
+    contract_id(), timestamp(), party_revision_param(), domain_revision(), contract_terms_varset(), pid()
+) ->
     dmsl_domain_thrift:'TermSet'() | woody_error:business_error().
 compute_contract_terms(ID, Timestamp, PartyRevision, DomainRevision, Varset, Client) ->
     Args = [ID, Timestamp, PartyRevision, DomainRevision, Varset],
@@ -210,7 +214,7 @@ suspend_shop(ID, Client) ->
 activate_shop(ID, Client) ->
     map_result_error(gen_server:call(Client, {call, 'ActivateShop', [ID]})).
 
--spec compute_shop_terms(shop_id(), timestamp(), party_revision_param(), varset(), pid()) ->
+-spec compute_shop_terms(shop_id(), timestamp(), party_revision_param(), shop_terms_varset(), pid()) ->
     dmsl_domain_thrift:'TermSet'() | woody_error:business_error().
 compute_shop_terms(ID, Timestamp, PartyRevision, VS, Client) ->
     map_result_error(gen_server:call(Client, {call, 'ComputeShopTerms', [ID, Timestamp, PartyRevision, VS]})).

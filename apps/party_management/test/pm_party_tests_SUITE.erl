@@ -620,7 +620,7 @@ contract_terms_retrieval(C) ->
     Client = cfg(client, C),
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID,
-    Varset = #payproc_Varset{},
+    Varset = #payproc_ComputeContractTermsVarset{},
     PartyRevision = pm_client_party:get_revision(Client),
     DomainRevision1 = pm_domain:head(),
     Timstamp1 = pm_datetime:format_now(),
@@ -958,7 +958,7 @@ contract_w2w_terms(C) ->
     PartyRevision = pm_client_party:get_revision(Client),
     DomainRevision1 = pm_domain:head(),
     Timstamp1 = pm_datetime:format_now(),
-    Varset = #payproc_Varset{
+    Varset = #payproc_ComputeContractTermsVarset{
         currency = ?cur(<<"RUB">>),
         amount = ?cash(2500, <<"RUB">>)
     },
@@ -1021,13 +1021,7 @@ shop_terms_retrieval(C) ->
     PartyID = cfg(party_id, C),
     ShopID = ?REAL_SHOP_ID,
     Timestamp = pm_datetime:format_now(),
-    VS = #payproc_Varset{
-        shop_id = ShopID,
-        party_id = PartyID,
-        category = ?cat(2),
-        currency = ?cur(<<"RUB">>),
-        identification_level = full
-    },
+    VS = #payproc_ComputeShopTermsVarset{},
     TermSet1 = pm_client_party:compute_shop_terms(ShopID, Timestamp, {timestamp, Timestamp}, VS, Client),
     #domain_TermSet{
         payments = #domain_PaymentsServiceTerms{
@@ -1837,9 +1831,9 @@ compute_terms_w_criteria(C) ->
                     Timstamp,
                     {revision, PartyRevision},
                     Revision,
-                    #payproc_Varset{
+                    #payproc_ComputeContractTermsVarset{
                         currency = ?cur(<<"KZT">>),
-                        payment_method = ?pmt(bank_card_deprecated, visa)
+                        payment_tool = ?bank_card_payment_tool(<<"bank">>)
                     },
                     Client
                 )
@@ -1853,9 +1847,9 @@ compute_terms_w_criteria(C) ->
                     Timstamp,
                     {revision, PartyRevision},
                     Revision,
-                    #payproc_Varset{
+                    #payproc_ComputeContractTermsVarset{
                         currency = ?cur(<<"KZT">>),
-                        payment_method = ?pmt(empty_cvv_bank_card_deprecated, visa)
+                        payment_tool = ?bank_card_payment_tool(<<"bank">>, true)
                     },
                     Client
                 )
@@ -1869,9 +1863,9 @@ compute_terms_w_criteria(C) ->
                     Timstamp,
                     {revision, PartyRevision},
                     Revision,
-                    #payproc_Varset{
+                    #payproc_ComputeContractTermsVarset{
                         currency = ?cur(<<"RUB">>),
-                        payment_method = ?pmt(bank_card_deprecated, visa)
+                        payment_tool = ?bank_card_payment_tool(<<"bank">>)
                     },
                     Client
                 )
