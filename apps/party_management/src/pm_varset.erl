@@ -46,7 +46,7 @@ encode_varset(Varset) ->
 decode_varset(Varset) ->
     decode_varset(Varset, #{}).
 -spec decode_varset(encoded_varset() | contract_terms_varset() | shop_terms_varset(), varset()) -> varset().
-decode_varset(Varset, VS) when is_record(Varset, payproc_Varset) ->
+decode_varset(#payproc_Varset{} = Varset, VS) ->
     genlib_map:compact(VS#{
         category => Varset#payproc_Varset.category,
         currency => Varset#payproc_Varset.currency,
@@ -63,13 +63,13 @@ decode_varset(Varset, VS) when is_record(Varset, payproc_Varset) ->
         party_id => Varset#payproc_Varset.party_id,
         bin_data => Varset#payproc_Varset.bin_data
     });
-decode_varset(Varset, VS) when is_record(Varset, payproc_ComputeShopTermsVarset) ->
+decode_varset(#payproc_ComputeShopTermsVarset{} = Varset, VS) ->
     genlib_map:compact(VS#{
         cost => Varset#payproc_ComputeShopTermsVarset.amount,
         payout_method => Varset#payproc_ComputeShopTermsVarset.payout_method,
         payment_tool => Varset#payproc_ComputeShopTermsVarset.payment_tool
     });
-decode_varset(Varset, VS) when is_record(Varset, payproc_ComputeContractTermsVarset) ->
+decode_varset(#payproc_ComputeContractTermsVarset{} = Varset, VS) ->
     genlib_map:compact(VS#{
         currency => Varset#payproc_ComputeContractTermsVarset.currency,
         cost => Varset#payproc_ComputeContractTermsVarset.amount,
