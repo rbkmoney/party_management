@@ -108,13 +108,14 @@ assert_shop_contract_valid(
     Categories = pm_selector:reduce_to_value(CategorySelector, #{}, Revision),
     _ =
         ordsets:is_element(CategoryRef, Categories) orelse
-            throw({invalid_changeset,
-                ?cm_invalid_shop_contract_terms_violated(
-                    ID,
-                    pm_contract:get_id(Contract),
-                    #domain_TermSet{payments = #domain_PaymentsServiceTerms{categories = CategorySelector}}
-                )
-            }),
+            throw(
+                {invalid_changeset,
+                    ?cm_invalid_shop_contract_terms_violated(
+                        ID,
+                        pm_contract:get_id(Contract),
+                        #domain_TermSet{payments = #domain_PaymentsServiceTerms{categories = CategorySelector}}
+                    )}
+            ),
     ok.
 
 assert_shop_payout_tool_valid(#domain_Shop{payout_tool_id = undefined, payout_schedule = undefined}, _) ->
@@ -130,14 +131,15 @@ assert_shop_payout_tool_valid(#domain_Shop{id = ID, payout_tool_id = PayoutToolI
         #domain_PayoutTool{currency = ShopAccountCurrency} ->
             ok;
         #domain_PayoutTool{currency = PayoutToolCurrency} ->
-            throw({invalid_changeset,
-                ?cm_invalid_shop_payout_tool_currency_mismatch(
-                    ID,
-                    PayoutToolID,
-                    ShopAccountCurrency,
-                    PayoutToolCurrency
-                )
-            });
+            throw(
+                {invalid_changeset,
+                    ?cm_invalid_shop_payout_tool_currency_mismatch(
+                        ID,
+                        PayoutToolID,
+                        ShopAccountCurrency,
+                        PayoutToolCurrency
+                    )}
+            );
         undefined ->
             throw({invalid_changeset, ?cm_invalid_shop_payout_tool_not_in_contract(ID, ContractID, PayoutToolID)})
     end.
