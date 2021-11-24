@@ -1398,14 +1398,15 @@ transmute_claim(V1, V2, Claim = #payproc_Claim{changeset = Changeset}) ->
         changeset = [transmute_party_modification(V1, V2, M) || M <- Changeset]
     });
 %% TODO: Hack. Remove later
-transmute_claim(V1, V2, Claim = ?legacy_claim(_, Status, Changeset, _, _, _)) ->
-    ClaimUpd = setelement(#payproc_Claim.changeset, Claim, [transmute_party_modification(V1, V2, M) || M <- Changeset]),
-    case Status of
-        ?accepted(Effects = [_ | _]) ->
-            setelement(#payproc_Claim.status, ClaimUpd, ?accepted([transmute_claim_effect(V1, V2, E) || E <- Effects]));
-        _ ->
-            ClaimUpd
-    end.
+transmute_claim(V1, V2, ?legacy_claim(ID, Status, Changeset, Revision, CreatedAt, UpdatedAt)) ->
+    transmute_claim(V1, V2, #payproc_Claim{
+        id = ID,
+        status = Status,
+        changeset = Changeset,
+        revision = Revision,
+        created_at = CreatedAt,
+        updated_at = UpdatedAt
+    }).
 
 transmute_claim_status(V1, V2, Claim = #payproc_Claim{status = ?accepted(Effects = [_ | _])}) ->
     Claim#payproc_Claim{
