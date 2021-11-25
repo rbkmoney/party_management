@@ -1499,6 +1499,28 @@ transmute_party_modification(
     ?legacy_contract_modification(
         ID,
         {creation,
+            ?legacy_contract_params_v2(
+                Contractor,
+                TemplateRef,
+                PaymentInstitutionRef
+            )}
+    )
+) ->
+    ?contract_modification(
+        ID,
+        {creation,
+            #payproc_ContractParams{
+                contractor = transmute_contractor(V1, V2, Contractor),
+                template = TemplateRef,
+                payment_institution = PaymentInstitutionRef
+            }}
+    );
+transmute_party_modification(
+    6 = V1,
+    7 = V2,
+    ?legacy_contract_modification(
+        ID,
+        {creation,
             ContractParams = #payproc_ContractParams{
                 contractor = Contractor
             }}
