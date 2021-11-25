@@ -1508,12 +1508,11 @@ transmute_party_modification(
 ) ->
     ?contract_modification(
         ID,
-        {creation,
-            #payproc_ContractParams{
-                contractor = transmute_contractor(V1, V2, Contractor),
-                template = TemplateRef,
-                payment_institution = PaymentInstitutionRef
-            }}
+        {creation, #payproc_ContractParams{
+            contractor = transmute_contractor(V1, V2, Contractor),
+            template = TemplateRef,
+            payment_institution = PaymentInstitutionRef
+        }}
     );
 transmute_party_modification(
     6 = V1,
