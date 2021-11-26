@@ -1,12 +1,8 @@
 -ifndef(__pm_legacy_party_structures_hrl__).
 -define(__pm_legacy_party_structures_hrl__, included).
 
--define(legacy_party_created(Party),
-    {party_created, Party}
-).
-
--define(legacy_party(ID, ContactInfo, CreatedAt, Blocking, Suspension, Contracts, Shops),
-    {domain_Party, ID, ContactInfo, CreatedAt, Blocking, Suspension, Contracts, Shops}
+-define(legacy_party_created_v1(ID, ContactInfo, CreatedAt, Blocking, Suspension, Contracts, Shops),
+    {party_created, {domain_Party, ID, ContactInfo, CreatedAt, Blocking, Suspension, Contracts, Shops}}
 ).
 
 -define(legacy_claim(

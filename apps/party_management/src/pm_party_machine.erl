@@ -1340,7 +1340,7 @@ transmute_state(St) ->
 transmute_change(
     1,
     2,
-    ?legacy_party_created(?legacy_party(ID, ContactInfo, CreatedAt, _, _, _, _))
+    ?legacy_party_created_v1(ID, ContactInfo, CreatedAt, _, _, _, _)
 ) ->
     ?party_created(ID, ContactInfo, CreatedAt);
 transmute_change(
@@ -1356,12 +1356,11 @@ transmute_change(
             UpdatedAt
         )
     )
-) when V1 =:= 1; V1 =:= 2; V1 =:= 3; V1 =:= 4; V1 =:= 5; V1 =:= 6 ->
-    NewChangeset = [transmute_party_modification(V1, V2, M) || M <- Changeset],
+) when V1 >= 1, V1 < ?TOP_VERSION ->
     ?claim_created(#payproc_Claim{
         id = ID,
         status = Status,
-        changeset = NewChangeset,
+        changeset = [transmute_party_modification(V1, V2, M) || M <- Changeset],
         revision = Revision,
         created_at = CreatedAt,
         updated_at = UpdatedAt
@@ -1369,18 +1368,26 @@ transmute_change(
 transmute_change(
     V1,
     V2,
+    ?claim_created(Claim = #payproc_Claim{changeset = Changeset})
+) when V1 >= 1, V1 < ?TOP_VERSION ->
+    ?claim_created(Claim#payproc_Claim{
+        changeset = [transmute_party_modification(V1, V2, M) || M <- Changeset]
+    });
+transmute_change(
+    V1,
+    V2,
     ?legacy_claim_updated(ID, Changeset, ClaimRevision, Timestamp)
-) when V1 =:= 1; V1 =:= 2; V1 =:= 3; V1 =:= 4; V1 =:= 5; V1 =:= 6 ->
+) when V1 >= 1, V1 < ?TOP_VERSION ->
     NewChangeset = [transmute_party_modification(V1, V2, M) || M <- Changeset],
     ?claim_updated(ID, NewChangeset, ClaimRevision, Timestamp);
 transmute_change(
     V1,
     V2,
     ?claim_status_changed(ID, ?accepted(Effects), ClaimRevision, Timestamp)
-) when V1 =:= 1; V1 =:= 2; V1 =:= 3; V1 =:= 4; V1 =:= 5; V1 =:= 6 ->
+) when V1 >= 1, V1 < ?TOP_VERSION ->
     NewEffects = [transmute_claim_effect(V1, V2, E) || E <- Effects],
     ?claim_status_changed(ID, ?accepted(NewEffects), ClaimRevision, Timestamp);
-transmute_change(V1, _, C) when V1 =:= 1; V1 =:= 2; V1 =:= 3; V1 =:= 4; V1 =:= 5; V1 =:= 6 ->
+transmute_change(V1, _, C) when V1 >= 1, V1 < ?TOP_VERSION ->
     C.
 
 -spec transmute_state(pos_integer(), pos_integer(), _LegacyState) -> st().
@@ -1499,27 +1506,6 @@ transmute_party_modification(
     ?legacy_contract_modification(
         ID,
         {creation,
-            ?legacy_contract_params_v2(
-                Contractor,
-                TemplateRef,
-                PaymentInstitutionRef
-            )}
-    )
-) ->
-    ?contract_modification(
-        ID,
-        {creation, #payproc_ContractParams{
-            contractor = transmute_contractor(V1, V2, Contractor),
-            template = TemplateRef,
-            payment_institution = PaymentInstitutionRef
-        }}
-    );
-transmute_party_modification(
-    6 = V1,
-    7 = V2,
-    ?legacy_contract_modification(
-        ID,
-        {creation,
             ContractParams = #payproc_ContractParams{
                 contractor = Contractor
             }}
@@ -1582,7 +1568,7 @@ transmute_party_modification(
             schedule = transmute_payout_schedule_ref(3, 4, PayoutScheduleRef)
         }}
     );
-transmute_party_modification(V1, _, C) when V1 =:= 1; V1 =:= 2; V1 =:= 3; V1 =:= 4; V1 =:= 5; V1 =:= 6 ->
+transmute_party_modification(V1, _, C) when V1 >= 1, V1 < ?TOP_VERSION ->
     C.
 
 transmute_claim_effect(
@@ -1870,7 +1856,7 @@ transmute_claim_effect(
             schedule = transmute_payout_schedule_ref(3, 4, PayoutSchedule)
         }}
     );
-transmute_claim_effect(V1, _, C) when V1 =:= 1; V1 =:= 2; V1 =:= 3; V1 =:= 4; V1 =:= 5; V1 =:= 6 ->
+transmute_claim_effect(V1, _, C) when V1 >= 1, V1 < ?TOP_VERSION ->
     C.
 
 transmute_contractor(
