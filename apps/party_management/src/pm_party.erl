@@ -11,6 +11,7 @@
 
 -include("party_events.hrl").
 
+-include_lib("damsel/include/dmsl_claim_management_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 -include_lib("damsel/include/dmsl_accounter_thrift.hrl").
 
@@ -67,7 +68,7 @@
 -type contract_template() :: dmsl_domain_thrift:'ContractTemplate'().
 -type shop() :: dmsl_domain_thrift:'Shop'().
 -type shop_id() :: dmsl_domain_thrift:'ShopID'().
--type shop_params() :: dmsl_payment_processing_thrift:'ShopParams'().
+-type shop_params() :: dmsl_payment_processing_thrift:'ShopParams'() | dmsl_claim_management_thrift:'ShopParams'().
 -type wallet() :: dmsl_domain_thrift:'Wallet'().
 -type wallet_id() :: dmsl_domain_thrift:'WalletID'().
 
@@ -144,7 +145,7 @@ get_terms(#domain_ContractTemplate{terms = TermSetHierarchyRef}, Timestamp, Revi
     get_term_set(TermSetHierarchyRef, Timestamp, Revision).
 
 -spec create_shop(shop_id(), shop_params(), timestamp()) -> shop().
-create_shop(ID, ShopParams, Timestamp) ->
+create_shop(ID, #payproc_ShopParams{} = ShopParams, Timestamp) ->
     #domain_Shop{
         id = ID,
         created_at = Timestamp,
@@ -155,6 +156,18 @@ create_shop(ID, ShopParams, Timestamp) ->
         location = ShopParams#payproc_ShopParams.location,
         contract_id = ShopParams#payproc_ShopParams.contract_id,
         payout_tool_id = ShopParams#payproc_ShopParams.payout_tool_id
+    };
+create_shop(ID, #claim_management_ShopParams{} = ShopParams, Timestamp) ->
+    #domain_Shop{
+        id = ID,
+        created_at = Timestamp,
+        blocking = ?unblocked(Timestamp),
+        suspension = ?active(Timestamp),
+        category = ShopParams#claim_management_ShopParams.category,
+        details = ShopParams#claim_management_ShopParams.details,
+        location = ShopParams#claim_management_ShopParams.location,
+        contract_id = ShopParams#claim_management_ShopParams.contract_id,
+        payout_tool_id = ShopParams#claim_management_ShopParams.payout_tool_id
     }.
 
 -spec get_shop(shop_id(), party()) -> shop() | undefined.
@@ -232,9 +245,6 @@ wallet_suspension(ID, Suspension, Party) ->
     set_wallet(Wallet#domain_Wallet{suspension = Suspension}, Party).
 
 %% Internals
-
-get_contract_id(#domain_Contract{id = ContractID}) ->
-    ContractID.
 
 ensure_shop(#domain_Shop{} = Shop) ->
     Shop;
@@ -479,12 +489,12 @@ assert_shop_contract_valid(
     Terms = get_terms(Contract, Timestamp, Revision),
     case ShopAccount of
         #domain_ShopAccount{currency = CurrencyRef} ->
-            _ = assert_currency_valid({shop, ID}, get_contract_id(Contract), CurrencyRef, Terms, Revision);
+            _ = assert_currency_valid({shop, ID}, pm_contract:get_id(Contract), CurrencyRef, Terms, Revision);
         undefined ->
             % TODO remove cross-deps between claim-party-contract
             pm_claim:raise_invalid_changeset(?invalid_shop(ID, {no_account, ID}))
     end,
-    _ = assert_category_valid({shop, ID}, get_contract_id(Contract), CategoryRef, Terms, Revision),
+    _ = assert_category_valid({shop, ID}, pm_contract:get_id(Contract), CategoryRef, Terms, Revision),
     ok.
 
 assert_shop_payout_tool_valid(#domain_Shop{payout_tool_id = undefined, payout_schedule = undefined}, _) ->
@@ -528,7 +538,7 @@ assert_wallet_contract_valid(#domain_Wallet{id = ID, account = Account}, Contrac
     case Account of
         #domain_WalletAccount{currency = CurrencyRef} ->
             Terms = get_terms(Contract, Timestamp, Revision),
-            _ = assert_currency_valid({wallet, ID}, get_contract_id(Contract), CurrencyRef, Terms, Revision),
+            _ = assert_currency_valid({wallet, ID}, pm_contract:get_id(Contract), CurrencyRef, Terms, Revision),
             ok;
         undefined ->
             pm_claim:raise_invalid_changeset(?invalid_wallet(ID, {no_account, ID}))

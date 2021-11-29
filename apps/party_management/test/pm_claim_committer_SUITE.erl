@@ -28,6 +28,8 @@
 -export([contract_already_exists/1]).
 -export([contract_already_terminated/1]).
 -export([shop_already_exists/1]).
+-export([invalid_shop_payout_tool_not_in_contract/1]).
+-export([invalid_shop_payout_tool_currency_mismatch/1]).
 
 -type config() :: pm_ct_helper:config().
 -type test_case_name() :: pm_ct_helper:test_case_name().
@@ -38,7 +40,9 @@
 -define(REAL_CONTRACT_ID2, <<"CONTRACT3">>).
 -define(REAL_PAYOUT_TOOL_ID1, <<"PAYOUTTOOL2">>).
 -define(REAL_PAYOUT_TOOL_ID2, <<"PAYOUTTOOL3">>).
+-define(REAL_PAYOUT_TOOL_ID4, <<"PAYOUTTOOL4">>).
 -define(REAL_SHOP_ID, <<"SHOP2">>).
+-define(REAL_SHOP_ID4, <<"SHOP4">>).
 
 %%% CT
 
@@ -63,7 +67,9 @@ all() ->
         contractor_already_exists,
         contract_already_exists,
         contract_already_terminated,
-        shop_already_exists
+        shop_already_exists,
+        invalid_shop_payout_tool_not_in_contract,
+        invalid_shop_payout_tool_currency_mismatch
     ].
 
 -spec init_per_suite(config()) -> config().
@@ -206,8 +212,8 @@ contract_adjustment_creation(C) ->
     PartyID = cfg(party_id, C),
     ContractID = ?REAL_CONTRACT_ID1,
     ID = <<"ADJ1">>,
-    AdjustmentTemplate = #domain_ContractTemplateRef{id = 2},
-    Modifications = [?cm_contract_modification(ContractID, ?cm_adjustment_creation(ID, AdjustmentTemplate))],
+    AdjustmentParams = #claim_management_ContractAdjustmentParams{template = #domain_ContractTemplateRef{id = 2}},
+    Modifications = [?cm_contract_modification(ContractID, ?cm_adjustment_creation(ID, AdjustmentParams))],
     Claim = claim(Modifications, PartyID),
     ok = accept_claim(Claim, C),
     ok = commit_claim(Claim, C),
@@ -349,17 +355,78 @@ invalid_cash_register_modification(C) ->
         description = <<"Updated shop description.">>
     },
     AnotherShopID = <<"Totaly not the valid one">>,
+    Mod = ?cm_shop_modification(AnotherShopID, {cash_register_modification_unit, CashRegisterModificationUnit}),
+    Modifications = [?cm_shop_modification(?REAL_SHOP_ID, {details_modification, NewDetails}), Mod],
+    Claim = claim(Modifications, PartyID),
+    {exception, ?cm_invalid_party_changeset(?cm_invalid_shop_not_exists(AnotherShopID), [{party_modification, Mod}])} =
+        accept_claim(Claim, C).
+
+-spec invalid_shop_payout_tool_not_in_contract(config()) -> _.
+invalid_shop_payout_tool_not_in_contract(C) ->
+    PartyID = cfg(party_id, C),
+    Details = #domain_ShopDetails{
+        name = <<"SOME SHOP NAME">>,
+        description = <<"Very meaningfull description of the shop.">>
+    },
+    Category = ?cat(2),
+    Location = {url, <<"https://example.com">>},
+    ContractID = ?REAL_CONTRACT_ID1,
+    ShopID = ?REAL_SHOP_ID4,
+    ShopParams = #claim_management_ShopParams{
+        category = Category,
+        location = Location,
+        details = Details,
+        contract_id = ContractID,
+        payout_tool_id = ?REAL_PAYOUT_TOOL_ID1
+    },
+    Schedule = ?bussched(1),
+    ScheduleParams = #claim_management_ScheduleModification{schedule = Schedule},
     Modifications = [
-        ?cm_shop_modification(?REAL_SHOP_ID, {details_modification, NewDetails}),
-        ?cm_shop_modification(AnotherShopID, {cash_register_modification_unit, CashRegisterModificationUnit})
+        ?cm_shop_creation(ShopID, ShopParams),
+        ?cm_shop_account_creation(ShopID, ?cur(<<"USD">>)),
+        ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
     ],
     Claim = claim(Modifications, PartyID),
-    Reason =
-        <<"{invalid_shop,{payproc_InvalidShop,<<\"", AnotherShopID/binary, "\">>,{not_exists,<<\"",
-            AnotherShopID/binary, "\">>}}}">>,
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = Reason
-    }} = accept_claim(Claim, C).
+    {exception,
+        ?cm_invalid_party_changeset(
+            ?cm_invalid_shop_payout_tool_currency_mismatch(
+                ShopID, ?REAL_PAYOUT_TOOL_ID1, ?cur(<<"USD">>), ?cur(<<"RUB">>)
+            ),
+            _
+        )} =
+        accept_claim(Claim, C).
+
+-spec invalid_shop_payout_tool_currency_mismatch(config()) -> _.
+invalid_shop_payout_tool_currency_mismatch(C) ->
+    PartyID = cfg(party_id, C),
+    Details = #domain_ShopDetails{
+        name = <<"SOME SHOP NAME">>,
+        description = <<"Very meaningfull description of the shop.">>
+    },
+    Category = ?cat(2),
+    Location = {url, <<"https://example.com">>},
+    ContractID = ?REAL_CONTRACT_ID1,
+    ShopID = ?REAL_SHOP_ID4,
+    ShopParams = #claim_management_ShopParams{
+        category = Category,
+        location = Location,
+        details = Details,
+        contract_id = ContractID,
+        payout_tool_id = ?REAL_PAYOUT_TOOL_ID4
+    },
+    Schedule = ?bussched(1),
+    ScheduleParams = #claim_management_ScheduleModification{schedule = Schedule},
+    Modifications = [
+        ?cm_shop_creation(ShopID, ShopParams),
+        ?cm_shop_account_creation(ShopID, ?cur(<<"RUB">>)),
+        ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
+    ],
+    Claim = claim(Modifications, PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(
+            ?cm_invalid_shop_payout_tool_not_in_contract(ShopID, ContractID, ?REAL_PAYOUT_TOOL_ID4), _
+        )} =
+        accept_claim(Claim, C).
 
 -spec shop_contract_modification(config()) -> _.
 shop_contract_modification(C) ->
@@ -399,43 +466,35 @@ contractor_already_exists(C) ->
     ContractorParams = pm_ct_helper:make_battle_ready_contractor(),
     PartyID = cfg(party_id, C),
     ContractorID = ?REAL_CONTRACTOR_ID1,
-    Modifications = [?cm_contractor_creation(ContractorID, ContractorParams)],
-    Claim = claim(Modifications, PartyID),
-    Reason =
-        <<"{invalid_contractor,{payproc_InvalidContractor,<<\"", ContractorID/binary, "\">>,{already_exists,<<\"",
-            ContractorID/binary, "\">>}}}">>,
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = Reason
-    }} = accept_claim(Claim, C).
+    Mod = ?cm_contractor_creation(ContractorID, ContractorParams),
+    Claim = claim([Mod], PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(?cm_invalid_contractor_already_exists(ContractorID), [{party_modification, Mod}])} =
+        accept_claim(Claim, C).
 
 -spec contract_already_exists(config()) -> _.
 contract_already_exists(C) ->
     PartyID = cfg(party_id, C),
     ContractParams = make_contract_params(?REAL_CONTRACTOR_ID1),
     ContractID = ?REAL_CONTRACT_ID1,
-    Modifications = [?cm_contract_creation(ContractID, ContractParams)],
-    Claim = claim(Modifications, PartyID),
-    Reason =
-        <<"{invalid_contract,{payproc_InvalidContract,<<\"", ContractID/binary, "\">>,{already_exists,<<\"",
-            ContractID/binary, "\">>}}}">>,
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = Reason
-    }} = accept_claim(Claim, C).
+    Mod = ?cm_contract_creation(ContractID, ContractParams),
+    Claim = claim([Mod], PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(?cm_invalid_contract_already_exists(ContractID), [{party_modification, Mod}])} =
+        accept_claim(Claim, C).
 
 -spec contract_already_terminated(config()) -> _.
 contract_already_terminated(C) ->
     ContractID = ?REAL_CONTRACT_ID1,
     PartyID = cfg(party_id, C),
     Reason = #claim_management_ContractTermination{reason = <<"Because!">>},
-    Modifications = [?cm_contract_modification(ContractID, {termination, Reason})],
-    Claim = claim(Modifications, PartyID),
-    ErrorReason =
-        <<"{invalid_contract,{payproc_InvalidContract,<<\"", ContractID/binary,
-            "\">>,{invalid_status,{terminated,{domain_ContractTerminated">>,
-    ErrorReasonSize = erlang:byte_size(ErrorReason),
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = <<ErrorReason:ErrorReasonSize/binary, _/binary>>
-    }} = accept_claim(Claim, C).
+    Mod = ?cm_contract_modification(ContractID, {termination, Reason}),
+    Claim = claim([Mod], PartyID),
+    {exception,
+        ?cm_invalid_party_changeset(?cm_invalid_contract_invalid_status_terminated(ContractID, _), [
+            {party_modification, Mod}
+        ])} =
+        accept_claim(Claim, C).
 
 -spec shop_already_exists(config()) -> _.
 shop_already_exists(C) ->
@@ -453,18 +512,16 @@ shop_already_exists(C) ->
         payout_tool_id = ?REAL_PAYOUT_TOOL_ID1
     },
     ScheduleParams = #claim_management_ScheduleModification{schedule = ?bussched(1)},
+    Mod = ?cm_shop_modification(ShopID, {creation, ShopParams}),
+
     Modifications = [
-        ?cm_shop_creation(ShopID, ShopParams),
+        Mod,
         ?cm_shop_account_creation(ShopID, ?cur(<<"RUB">>)),
         ?cm_shop_modification(ShopID, {payout_schedule_modification, ScheduleParams})
     ],
     Claim = claim(Modifications, PartyID),
-    Reason =
-        <<"{invalid_shop,{payproc_InvalidShop,<<\"", ShopID/binary, "\">>,{already_exists,<<\"", ShopID/binary,
-            "\">>}}}">>,
-    {exception, #claim_management_InvalidChangeset{
-        reason_legacy = Reason
-    }} = accept_claim(Claim, C).
+    {exception, ?cm_invalid_party_changeset(?cm_invalid_shop_already_exists(ShopID), [{party_modification, Mod}])} =
+        accept_claim(Claim, C).
 
 %%% Internal functions
 

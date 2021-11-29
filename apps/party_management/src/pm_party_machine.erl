@@ -238,70 +238,52 @@ handle_call('RevokeClaim', {_, _PartyID, ID, ClaimRevision, Reason}, AuxSt, St) 
     );
 %% ClaimCommitter
 
-handle_call('Accept', {_PartyID, Claim}, AuxSt, St) ->
+handle_call('Accept', {_PartyID, #claim_management_Claim{changeset = Changeset}}, AuxSt, St) ->
+    Party = get_st_party(St),
+    Timestamp = pm_datetime:format_now(),
+    Revision = pm_domain:head(),
+    Modifications = pm_claim_committer:filter_party_modifications(Changeset),
+    ok = pm_claim_committer:assert_cash_register_modifications_applicable(Modifications, Party),
+    ok = pm_claim_committer:assert_modifications_applicable(Modifications, Timestamp, Revision, Party),
+    ok = pm_claim_committer:assert_modifications_acceptable(Modifications, Timestamp, Revision, Party),
+    respond(ok, [], AuxSt, St);
+handle_call('Commit', {_PartyID, Claim}, AuxSt, St) ->
     #claim_management_Claim{
-        changeset = Changeset
+        id = ID,
+        changeset = Changeset,
+        revision = Revision,
+        created_at = CreatedAt,
+        updated_at = UpdatedAt
     } = Claim,
-    try
-        Party = get_st_party(St),
-        ok = pm_claim_committer:assert_cash_regisrter_modifications_applicable(Changeset, Party),
-        case pm_claim_committer:from_claim_mgmt(Claim) of
-            undefined ->
-                ok;
-            PayprocClaim ->
-                Timestamp = pm_datetime:format_now(),
-                Revision = pm_domain:head(),
-
-                ok = pm_claim:assert_applicable(PayprocClaim, Timestamp, Revision, Party),
-                ok = pm_claim:assert_acceptable(PayprocClaim, Timestamp, Revision, Party)
-        end,
-        respond(
-            ok,
-            [],
-            AuxSt,
-            St
-        )
-    catch
-        throw:#payproc_InvalidChangeset{reason = Reason0} ->
-            ModificationChangeset = [
-                Modification
-             || #claim_management_ModificationUnit{
-                    modification = Modification
-                } <- Changeset
-            ],
-            ReasonLegacy = unicode:characters_to_binary(io_lib:format("~0tp", [Reason0])),
-            % TODO ED-274:  временная функция для возможности работы со старой системой исключений
-            % !!! для конвертации ShopPayoutToolInvalid -> InvalidShopPayoutTool недостаточно данных
-            Reason = map_invalid_changeset_reason(Reason0),
-            erlang:throw(#claim_management_InvalidChangeset{
-                reason = {invalid_party_changeset, Reason},
-                invalid_changeset = ModificationChangeset,
-                reason_legacy = ReasonLegacy
-            })
-    end;
-handle_call('Commit', {_PartyID, CmClaim}, AuxSt, St) ->
-    PayprocClaim = pm_claim_committer:from_claim_mgmt(CmClaim),
-    Changes = get_changes(PayprocClaim, St),
+    Party = get_st_party(St),
+    Timestamp = pm_datetime:format_now(),
+    DomainRevision = pm_domain:head(),
+    Modifications = pm_claim_committer:filter_party_modifications(Changeset),
+    ok = pm_claim_committer:assert_modifications_acceptable(Modifications, Timestamp, DomainRevision, Party),
+    Effects = pm_claim_committer_effect:make_modifications_effects(Modifications, Timestamp, DomainRevision),
+    PartyClaim = pm_claim_committer_converter:new_party_claim(ID, Revision, CreatedAt, UpdatedAt),
+    AcceptedPartyClaim = set_status(?accepted(Effects), get_next_revision(PartyClaim), Timestamp, PartyClaim),
+    PartyRevision = get_next_party_revision(St),
     respond(
         ok,
-        Changes,
+        [
+            ?claim_created(PartyClaim),
+            finalize_claim(AcceptedPartyClaim, Timestamp),
+            ?revision_changed(Timestamp, PartyRevision)
+        ],
         AuxSt,
         St
     ).
 
-get_changes(undefined, _St) ->
-    [];
-get_changes(PayprocClaim, St) ->
-    Timestamp = pm_datetime:format_now(),
-    Revision = pm_domain:head(),
-    Party = get_st_party(St),
-    AcceptedClaim = pm_claim:accept(Timestamp, Revision, Party, PayprocClaim),
-    PartyRevision = get_next_party_revision(St),
-    [
-        ?claim_created(PayprocClaim),
-        finalize_claim(AcceptedClaim, Timestamp),
-        ?revision_changed(Timestamp, PartyRevision)
-    ].
+get_next_revision(#payproc_Claim{revision = ClaimRevision}) ->
+    ClaimRevision + 1.
+
+set_status(Status, NewRevision, Timestamp, Claim) ->
+    Claim#payproc_Claim{
+        revision = NewRevision,
+        updated_at = Timestamp,
+        status = Status
+    }.
 
 %% Generic handlers
 
@@ -489,86 +471,6 @@ map_error({error, notfound}) ->
     throw(#payproc_PartyNotFound{});
 map_error({error, Reason}) ->
     error(Reason).
-
-map_invalid_changeset_reason({invalid_contract, Reason}) ->
-    {invalid_contract, #claim_management_InvalidContract{
-        id = Reason#payproc_InvalidContract.id,
-        reason = map_invalid_contract_reason(Reason#payproc_InvalidContract.reason)
-    }};
-map_invalid_changeset_reason({invalid_shop, Reason}) ->
-    {invalid_shop, #claim_management_InvalidShop{
-        id = Reason#payproc_InvalidShop.id,
-        reason = map_invalid_shop_reason(Reason#payproc_InvalidShop.reason)
-    }};
-map_invalid_changeset_reason({invalid_wallet, Reason}) ->
-    {invalid_wallet, #claim_management_InvalidWallet{
-        id = Reason#payproc_InvalidWallet.id,
-        reason = map_invalid_wallet_reason(Reason#payproc_InvalidWallet.reason)
-    }};
-map_invalid_changeset_reason({invalid_contractor, Reason}) ->
-    {invalid_contractor, #claim_management_InvalidContractor{
-        id = Reason#payproc_InvalidContractor.id,
-        reason = map_invalid_contractor_reason(Reason#payproc_InvalidContractor.reason)
-    }}.
-
-map_invalid_contract_reason({not_exists, _}) ->
-    {not_exists, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_contract_reason({already_exists, _}) ->
-    {already_exists, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_contract_reason({invalid_object_reference, InvalidObjectReference}) ->
-    {invalid_object_reference, map_invalid_object_reference(InvalidObjectReference)};
-map_invalid_contract_reason({contractor_not_exists, ContractorNotExists}) ->
-    {contractor_not_exists, #claim_management_ContractorNotExists{
-        id = ContractorNotExists#payproc_ContractorNotExists.id
-    }};
-map_invalid_contract_reason(OtherReason) ->
-    OtherReason.
-
-map_invalid_shop_reason({not_exists, _}) ->
-    {not_exists, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_shop_reason({already_exists, _}) ->
-    {already_exists, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_shop_reason({no_account, _}) ->
-    {no_account, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_shop_reason({invalid_status, InvalidStatus}) ->
-    {invalid_status, map_invalid_status(InvalidStatus)};
-map_invalid_shop_reason({contract_terms_violated, ContractTermsViolated}) ->
-    {contract_terms_violated, map_contract_terms_violated(ContractTermsViolated)};
-map_invalid_shop_reason({payout_tool_invalid, _InvalidShopPayoutTool}) ->
-    % TODO ED-274: для конвертации ShopPayoutToolInvalid -> InvalidShopPayoutTool недостаточно данных
-    undefined;
-map_invalid_shop_reason({invalid_object_reference, InvalidObjectReference}) ->
-    {invalid_object_reference, map_invalid_object_reference(InvalidObjectReference)}.
-
-map_invalid_wallet_reason({not_exists, _}) ->
-    {not_exists, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_wallet_reason({already_exists, _}) ->
-    {already_exists, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_wallet_reason({no_account, _}) ->
-    {no_account, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_wallet_reason({invalid_status, InvalidStatus}) ->
-    {invalid_status, map_invalid_status(InvalidStatus)};
-map_invalid_wallet_reason({contract_terms_violated, ContractTermsViolated}) ->
-    {contract_terms_violated, map_contract_terms_violated(ContractTermsViolated)}.
-
-map_invalid_contractor_reason({not_exists, _}) ->
-    {not_exists, #claim_management_InvalidClaimConcreteReason{}};
-map_invalid_contractor_reason({already_exists, _}) ->
-    {already_exists, #claim_management_InvalidClaimConcreteReason{}}.
-
-map_contract_terms_violated(ContractTermsViolated) ->
-    #claim_management_ContractTermsViolated{
-        contract_id = ContractTermsViolated#payproc_ContractTermsViolated.contract_id,
-        terms = ContractTermsViolated#payproc_ContractTermsViolated.terms
-    }.
-
-map_invalid_object_reference(InvalidObjectReference) ->
-    #claim_management_InvalidObjectReference{
-        ref = InvalidObjectReference#payproc_InvalidObjectReference.ref
-    }.
-
-map_invalid_status(Status) ->
-    Status.
 
 -spec get_claim(claim_id(), party_id()) -> claim() | no_return().
 get_claim(ID, PartyID) ->
@@ -1104,6 +1006,8 @@ ensure_claim(
         status = Status
     }.
 
+ensure_claim_changeset(undefined, _) ->
+    undefined;
 ensure_claim_changeset(Changeset, Timestamp) ->
     [ensure_contract_change(C, Timestamp) || C <- Changeset].
 

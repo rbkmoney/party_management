@@ -29,7 +29,6 @@
 -export([make_meta_data/1]).
 
 -include("pm_ct_domain.hrl").
--include("pm_ct_json.hrl").
 
 -include_lib("damsel/include/dmsl_base_thrift.hrl").
 -include_lib("damsel/include/dmsl_domain_thrift.hrl").

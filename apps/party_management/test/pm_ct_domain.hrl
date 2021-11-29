@@ -7,7 +7,6 @@
 
 -define(ordset(Es), ordsets:from_list(Es)).
 
--define(glob(), #domain_GlobalsRef{}).
 -define(cur(ID), #domain_CurrencyRef{symbolic_code = ID}).
 -define(pmt(C, T), #domain_PaymentMethodRef{id = {C, T}}).
 -define(pmt_sys(ID), #domain_PaymentSystemRef{id = ID}).
@@ -37,7 +36,6 @@
     payment_token = ?token_srv(Prv),
     tokenization_method = Method
 }).
--define(wtdrlprov(ID), #domain_WithdrawalProviderRef{id = ID}).
 -define(crit(ID), #domain_CriterionRef{id = ID}).
 -define(crp(ID), #domain_CashRegisterProviderRef{id = ID}).
 
@@ -74,13 +72,6 @@
     source = A1,
     destination = A2,
     volume = V
-}).
-
--define(cfpost(A1, A2, V, D), #domain_CashFlowPosting{
-    source = A1,
-    destination = A2,
-    volume = V,
-    details = D
 }).
 
 -define(tkz_bank_card(PaymentSystem, TokenProvider), ?tkz_bank_card(PaymentSystem, TokenProvider, dpan)).
