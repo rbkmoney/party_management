@@ -34,6 +34,8 @@ new_party_claim(ID, Revision, CreatedAt, UpdatedAt) ->
         id = ID,
         status = ?pending(),
         revision = Revision,
+        %% Added for backward compatibility
+        changeset = [],
         created_at = CreatedAt,
         updated_at = UpdatedAt,
         caused_by = build_claim_ref(ID, Revision)
